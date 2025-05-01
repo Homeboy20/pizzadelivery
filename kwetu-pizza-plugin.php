@@ -45,6 +45,7 @@ add_action('admin_enqueue_scripts', 'kwetupizza_enqueue_scripts');
 // Activation hooks
 register_activation_hook(__FILE__, 'kwetupizza_create_tables');
 register_activation_hook(__FILE__, 'kwetupizza_create_pages');
+register_activation_hook(__FILE__, 'kwetupizza_create_sample_delivery_zones');
 
 // Create menu in the WordPress dashboard
 function kwetupizza_create_menu() {

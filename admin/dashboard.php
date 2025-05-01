@@ -192,7 +192,46 @@ if (!function_exists('kwetupizza_render_dashboard')) {
                 },
             }
         });
+
+        // Initialize Sample Data AJAX handler
+        jQuery(document).ready(function($) {
+            $('#init-sample-data').on('click', function(e) {
+                e.preventDefault();
+                $(this).prop('disabled', true).text('Initializing...');
+                
+                $.ajax({
+                    url: ajaxurl,
+                    type: 'POST',
+                    data: {
+                        action: 'kwetupizza_init_sample_data',
+                        nonce: '<?php echo wp_create_nonce('kwetupizza-nonce'); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#sample-data-message').html('<div class="notice notice-success"><p>' + response.data + '</p></div>');
+                        } else {
+                            $('#sample-data-message').html('<div class="notice notice-error"><p>Failed to initialize sample data.</p></div>');
+                        }
+                        $('#init-sample-data').prop('disabled', false).text('Initialize Sample Data');
+                    },
+                    error: function() {
+                        $('#sample-data-message').html('<div class="notice notice-error"><p>An error occurred while initializing sample data.</p></div>');
+                        $('#init-sample-data').prop('disabled', false).text('Initialize Sample Data');
+                    }
+                });
+            });
+        });
     </script>
+
+    <div class="dashboard-section sample-data-section" style="width: 100%; margin-top: 30px; border-top: 1px solid #ccc; padding-top: 20px;">
+        <h2>Sample Data Management</h2>
+        <p>Use this section to initialize sample data for testing the application.</p>
+        
+        <div id="sample-data-message"></div>
+        
+        <button id="init-sample-data" class="button button-primary">Initialize Sample Data</button>
+        <p class="description">This will create sample delivery zones if none exist.</p>
+    </div>
     <?php
     }
 }
