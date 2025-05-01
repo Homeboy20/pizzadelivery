@@ -1,0 +1,337 @@
+/**
+ * KwetuPizza Order Tracking Styles
+ * 
+ * Styles for the order tracking interface.
+ */
+
+.kwetupizza-tracking-container {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+.kwetupizza-tracking-container h2 {
+  text-align: center;
+  color: var(--kwetu-primary, #ff5722);
+  margin-bottom: 30px;
+}
+
+/* Tracking Form */
+.kwetupizza-tracking-form {
+  background-color: #fff;
+  padding: 25px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  margin-bottom: 30px;
+}
+
+.kwetupizza-form-group {
+  margin-bottom: 15px;
+}
+
+.kwetupizza-form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #333;
+}
+
+.kwetupizza-form-group input {
+  width: 100%;
+  padding: 10px 15px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+.kwetupizza-form-group small {
+  display: block;
+  color: #666;
+  font-size: 0.8rem;
+  margin-top: 5px;
+}
+
+#kwetupizza-track-order-button {
+  background-color: var(--kwetu-primary, #ff5722);
+  color: white;
+  border: none;
+  padding: 12px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  width: 100%;
+  font-size: 1rem;
+  transition: background-color 0.3s ease;
+}
+
+#kwetupizza-track-order-button:hover {
+  background-color: var(--kwetu-primary-dark, #e64a19);
+}
+
+/* Tracking Results */
+.kwetupizza-tracking-results {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.kwetupizza-tracking-header {
+  background-color: #f8f8f8;
+  padding: 20px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kwetupizza-tracking-header h3 {
+  font-size: 1.3rem;
+  margin: 0;
+  color: #333;
+}
+
+.kwetupizza-tracking-status {
+  font-weight: 500;
+}
+
+.kwetupizza-tracking-status span {
+  display: inline-block;
+  padding: 5px 10px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  background-color: #f1f1f1;
+}
+
+.kwetupizza-tracking-status .status-pending {
+  background-color: #ffeeba;
+  color: #856404;
+}
+
+.kwetupizza-tracking-status .status-processing {
+  background-color: #b8daff;
+  color: #004085;
+}
+
+.kwetupizza-tracking-status .status-out_for_delivery {
+  background-color: #c3e6cb;
+  color: #155724;
+}
+
+.kwetupizza-tracking-status .status-completed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.kwetupizza-tracking-status .status-cancelled {
+  background-color: #f5c6cb;
+  color: #721c24;
+}
+
+.kwetupizza-tracking-status .status-payment_failed {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.kwetupizza-tracking-details {
+  padding: 20px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+}
+
+.kwetupizza-tracking-info {
+  flex: 1;
+  min-width: 250px;
+}
+
+.kwetupizza-info-group {
+  margin-bottom: 15px;
+}
+
+.kwetupizza-info-group label {
+  font-weight: 500;
+  display: block;
+  margin-bottom: 3px;
+  color: #666;
+}
+
+.kwetupizza-info-group span {
+  color: #333;
+}
+
+.kwetupizza-order-items {
+  flex: 1;
+  min-width: 250px;
+}
+
+.kwetupizza-order-items h4 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.kwetupizza-order-items ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.kwetupizza-order-items li {
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.kwetupizza-order-items li:last-child {
+  border-bottom: none;
+}
+
+/* Timeline */
+.kwetupizza-tracking-timeline {
+  padding: 20px;
+  border-top: 1px solid #eee;
+}
+
+.kwetupizza-tracking-timeline h4 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.kwetupizza-tracking-timeline ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  position: relative;
+}
+
+.kwetupizza-tracking-timeline ul:before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 15px;
+  width: 2px;
+  background-color: #ddd;
+}
+
+.kwetupizza-tracking-timeline li {
+  position: relative;
+  padding-left: 45px;
+  padding-bottom: 25px;
+}
+
+.kwetupizza-tracking-timeline li:last-child {
+  padding-bottom: 0;
+}
+
+.kwetupizza-tracking-timeline li:before {
+  content: '';
+  position: absolute;
+  left: 7px;
+  top: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background-color: var(--kwetu-primary, #ff5722);
+}
+
+.kwetupizza-tracking-timeline li.completed:before {
+  background-color: var(--kwetu-secondary, #4caf50);
+}
+
+.kwetupizza-timeline-event {
+  font-weight: 500;
+  margin-bottom: 5px;
+  color: #333;
+}
+
+.kwetupizza-timeline-time {
+  display: block;
+  font-size: 0.8rem;
+  color: #666;
+  margin-bottom: 3px;
+}
+
+.kwetupizza-timeline-description {
+  font-size: 0.9rem;
+  color: #555;
+}
+
+/* Error Message */
+.kwetupizza-tracking-error {
+  background-color: #f8d7da;
+  color: #721c24;
+  padding: 15px;
+  border-radius: 8px;
+  margin-top: 20px;
+  text-align: center;
+}
+
+/* Loading Animation */
+.kwetupizza-loading {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.kwetupizza-loading:after {
+  content: '';
+  display: block;
+  width: 30px;
+  height: 30px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid var(--kwetu-primary, #ff5722);
+  border-radius: 50%;
+  margin: 10px auto 0;
+  animation: kwetupizza-spin 1s linear infinite;
+}
+
+@keyframes kwetupizza-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Estimated Delivery Map */
+.kwetupizza-delivery-map {
+  margin-top: 20px;
+  height: 250px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .kwetupizza-tracking-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .kwetupizza-tracking-status {
+    margin-top: 10px;
+  }
+  
+  .kwetupizza-tracking-details {
+    flex-direction: column;
+  }
+}
+
+/* Pulse Animation for "Out for Delivery" Status */
+@keyframes kwetupizza-pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.status-out_for_delivery {
+  animation: kwetupizza-pulse 2s infinite;
+} 

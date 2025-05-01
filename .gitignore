@@ -1,0 +1,21 @@
+# WordPress plugin specific excludes
+.DS_Store
+.idea/
+.vscode/
+.cursor/
+node_modules/
+vendor/
+*.log
+*.bak
+*.swp
+*.zip
+thumbs.db
+
+# Specific log files
+includes/whatsapp-webhook.log
+includes/kwetupizza-debug.log
+includes/flutterwave-webhook.log
+includes/flutterwave-payment-webhook.log
+
+# Zip archives
+assets/Chart.js-master.zip 

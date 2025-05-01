@@ -1,0 +1,457 @@
+/**
+ * KwetuPizza Customer Account Styles
+ * 
+ * Styles for the customer account shortcode.
+ */
+
+.kwetupizza-account-container {
+  max-width: 1000px;
+  margin: 0 auto;
+  padding: 20px;
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Login Section */
+.kwetupizza-login-section {
+  max-width: 400px;
+  margin: 0 auto;
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.kwetupizza-login-section h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: var(--kwetu-primary, #ff5722);
+}
+
+.kwetupizza-login-form {
+  margin-top: 20px;
+}
+
+.kwetupizza-login-info {
+  margin-top: 15px;
+  font-size: 0.9rem;
+  color: #666;
+}
+
+/* Verification Section */
+.kwetupizza-verification-section {
+  max-width: 400px;
+  margin: 0 auto;
+  background-color: white;
+  padding: 30px;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.kwetupizza-verification-section h2 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: var(--kwetu-primary, #ff5722);
+}
+
+/* Dashboard Section */
+.kwetupizza-dashboard-section {
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.kwetupizza-dashboard-header {
+  background-color: var(--kwetu-primary, #ff5722);
+  color: white;
+  padding: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kwetupizza-dashboard-header h2 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+#kwetupizza-logout-button {
+  background-color: rgba(255, 255, 255, 0.2);
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+#kwetupizza-logout-button:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Dashboard Tabs */
+.kwetupizza-dashboard-tabs {
+  display: flex;
+  background-color: #f5f5f5;
+  border-bottom: 1px solid #eee;
+}
+
+.kwetupizza-tab {
+  padding: 15px 20px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-weight: 500;
+  color: #555;
+  position: relative;
+}
+
+.kwetupizza-tab.active {
+  color: var(--kwetu-primary, #ff5722);
+  background-color: white;
+}
+
+.kwetupizza-tab.active:after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background-color: var(--kwetu-primary, #ff5722);
+}
+
+.kwetupizza-tab:hover {
+  background-color: rgba(255, 87, 34, 0.05);
+}
+
+/* Tab Content */
+.kwetupizza-tab-content {
+  padding: 20px;
+}
+
+.kwetupizza-tab-content h3 {
+  margin-top: 0;
+  margin-bottom: 20px;
+  color: #333;
+  font-size: 1.3rem;
+}
+
+/* Order History */
+.kwetupizza-orders-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.kwetupizza-order-card {
+  background-color: #f9f9f9;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.kwetupizza-order-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.kwetupizza-order-header {
+  background-color: #f1f1f1;
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.kwetupizza-order-number {
+  font-weight: 500;
+  color: #333;
+}
+
+.kwetupizza-order-date {
+  font-size: 0.9rem;
+  color: #666;
+}
+
+.kwetupizza-order-info {
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid #eee;
+}
+
+.kwetupizza-order-status {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 3px;
+  font-size: 0.8rem;
+  background-color: #f1f1f1;
+}
+
+.status-pending {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.status-processing {
+  background-color: #cce5ff;
+  color: #004085;
+}
+
+.status-out_for_delivery {
+  background-color: #d1ecf1;
+  color: #0c5460;
+}
+
+.status-completed {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.status-cancelled {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.status-payment_failed {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.kwetupizza-order-total {
+  font-weight: 500;
+  color: var(--kwetu-primary, #ff5722);
+}
+
+.kwetupizza-order-items-preview {
+  padding: 15px;
+  min-height: 80px;
+}
+
+.kwetupizza-order-items-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.kwetupizza-order-items-list li {
+  padding: 5px 0;
+  font-size: 0.9rem;
+  color: #555;
+}
+
+.kwetupizza-order-actions {
+  padding: 15px;
+  display: flex;
+  justify-content: space-between;
+  border-top: 1px solid #eee;
+}
+
+/* Loyalty Points */
+.kwetupizza-loyalty-summary {
+  margin-bottom: 30px;
+}
+
+.kwetupizza-points-card {
+  background: linear-gradient(45deg, var(--kwetu-primary, #ff5722), #ff9800);
+  border-radius: 12px;
+  padding: 20px;
+  color: white;
+  text-align: center;
+  max-width: 300px;
+  margin: 0 auto;
+  box-shadow: 0 4px 10px rgba(255, 87, 34, 0.3);
+}
+
+.kwetupizza-points-header h4 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 500;
+}
+
+.kwetupizza-points-value {
+  font-size: 3rem;
+  font-weight: 700;
+  padding: 20px 0;
+}
+
+.kwetupizza-points-footer {
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.kwetupizza-rewards-list {
+  margin-top: 30px;
+}
+
+.kwetupizza-rewards-list h4 {
+  margin-bottom: 15px;
+  color: #333;
+  font-size: 1.1rem;
+}
+
+.kwetupizza-rewards-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.kwetupizza-reward-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 15px;
+  background-color: #f5f5f5;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  transition: background-color 0.2s ease;
+}
+
+.kwetupizza-reward-item:hover {
+  background-color: #f0f0f0;
+}
+
+.kwetupizza-reward-name {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 3px;
+}
+
+.kwetupizza-reward-points {
+  font-size: 0.9rem;
+  color: var(--kwetu-primary, #ff5722);
+}
+
+.kwetupizza-reward-message {
+  padding: 15px;
+  text-align: center;
+  color: #666;
+}
+
+.redeem-reward-btn {
+  background-color: var(--kwetu-secondary, #4caf50);
+}
+
+.redeem-reward-btn:hover {
+  background-color: var(--kwetu-secondary-dark, #388e3c);
+}
+
+/* Profile Form */
+#kwetupizza-profile-form .kwetupizza-form-group {
+  margin-bottom: 20px;
+}
+
+#kwetupizza-profile-form label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+  color: #333;
+}
+
+#kwetupizza-profile-form input,
+#kwetupizza-profile-form textarea {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 1rem;
+}
+
+#kwetupizza-profile-form textarea {
+  min-height: 100px;
+}
+
+.kwetupizza-update-profile-button {
+  background-color: var(--kwetu-primary, #ff5722);
+  color: white;
+  border: none;
+  padding: 10px 20px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.kwetupizza-update-profile-button:hover {
+  background-color: var(--kwetu-primary-dark, #e64a19);
+}
+
+/* Loading State */
+.kwetupizza-loading {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+}
+
+.kwetupizza-loading:after {
+  content: '';
+  display: block;
+  width: 30px;
+  height: 30px;
+  border: 3px solid #f3f3f3;
+  border-top: 3px solid var(--kwetu-primary, #ff5722);
+  border-radius: 50%;
+  margin: 10px auto 0;
+  animation: kwetupizza-spin 1s linear infinite;
+}
+
+@keyframes kwetupizza-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+  .kwetupizza-dashboard-tabs {
+    flex-wrap: wrap;
+  }
+  
+  .kwetupizza-tab {
+    padding: 12px 15px;
+    flex-grow: 1;
+    text-align: center;
+    width: 33.333%;
+  }
+  
+  .kwetupizza-order-card {
+    width: 100%;
+  }
+  
+  .kwetupizza-orders-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .kwetupizza-order-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .kwetupizza-order-actions a,
+  .kwetupizza-order-actions button {
+    width: 100%;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .kwetupizza-tab {
+    font-size: 0.9rem;
+    padding: 10px;
+  }
+  
+  .kwetupizza-dashboard-header {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  #kwetupizza-logout-button {
+    margin-top: 10px;
+  }
+  
+  .kwetupizza-points-value {
+    font-size: 2.5rem;
+  }
+} 

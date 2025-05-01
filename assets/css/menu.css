@@ -1,0 +1,420 @@
+/**
+ * KwetuPizza Menu Styles
+ * 
+ * Styles for the menu display shortcode.
+ */
+
+.kwetupizza-menu-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 30px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+/* Menu Filters */
+.kwetupizza-menu-filters {
+  flex: 1;
+  min-width: 200px;
+  max-width: 250px;
+}
+
+.kwetupizza-menu-filters ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.kwetupizza-menu-filters li {
+  border-bottom: 1px solid #eee;
+}
+
+.kwetupizza-menu-filters li:last-child {
+  border-bottom: none;
+}
+
+.kwetupizza-menu-filters a {
+  display: block;
+  padding: 12px 15px;
+  color: #333;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  font-weight: 500;
+}
+
+.kwetupizza-menu-filters a:hover {
+  background-color: #fff3e0;
+  color: var(--kwetu-primary);
+}
+
+.kwetupizza-menu-filters a.active {
+  background-color: var(--kwetu-primary);
+  color: white;
+}
+
+/* Menu Items Area */
+.kwetupizza-menu-items {
+  flex: 3;
+  min-width: 300px;
+}
+
+.kwetupizza-category-section {
+  margin-bottom: 40px;
+}
+
+.kwetupizza-category-section h2 {
+  font-size: 1.8rem;
+  margin-bottom: 20px;
+  color: var(--kwetu-primary);
+  padding-bottom: 5px;
+  border-bottom: 2px solid var(--kwetu-primary);
+}
+
+/* Product Grid */
+.kwetupizza-product-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+
+/* Product Card */
+.kwetupizza-product-card {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.kwetupizza-product-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+}
+
+.kwetupizza-product-image {
+  height: 180px;
+  overflow: hidden;
+  position: relative;
+}
+
+.kwetupizza-product-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.3s ease;
+}
+
+.kwetupizza-product-card:hover .kwetupizza-product-image img {
+  transform: scale(1.05);
+}
+
+.kwetupizza-product-details {
+  padding: 15px;
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.kwetupizza-product-details h3 {
+  font-size: 1.2rem;
+  margin-bottom: 10px;
+  color: var(--kwetu-text);
+}
+
+.kwetupizza-product-description {
+  color: var(--kwetu-light-text);
+  font-size: 0.9rem;
+  margin-bottom: 15px;
+  flex-grow: 1;
+}
+
+.kwetupizza-product-price {
+  font-weight: bold;
+  color: var(--kwetu-primary);
+  font-size: 1.1rem;
+  margin-bottom: 15px;
+}
+
+.kwetupizza-add-to-cart {
+  background-color: var(--kwetu-primary);
+  color: white;
+  border: none;
+  padding: 8px 15px;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-weight: 500;
+}
+
+.kwetupizza-add-to-cart:hover {
+  background-color: var(--kwetu-primary-dark);
+}
+
+/* Shopping Cart */
+.kwetupizza-cart {
+  position: sticky;
+  top: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.kwetupizza-cart h2 {
+  font-size: 1.3rem;
+  margin-bottom: 15px;
+  color: var(--kwetu-text);
+  border-bottom: 1px solid #eee;
+  padding-bottom: 10px;
+}
+
+.kwetupizza-cart-items {
+  max-height: 300px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.kwetupizza-cart-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid #eee;
+}
+
+.kwetupizza-cart-item-details {
+  flex-grow: 1;
+}
+
+.kwetupizza-cart-item-name {
+  font-weight: 500;
+}
+
+.kwetupizza-cart-item-price {
+  color: var(--kwetu-light-text);
+  font-size: 0.9rem;
+}
+
+.kwetupizza-cart-item-quantity {
+  display: flex;
+  align-items: center;
+}
+
+.kwetupizza-quantity-btn {
+  background-color: #f5f5f5;
+  border: none;
+  width: 25px;
+  height: 25px;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.kwetupizza-quantity-input {
+  width: 40px;
+  text-align: center;
+  border: 1px solid #eee;
+  margin: 0 5px;
+  padding: 2px;
+}
+
+.kwetupizza-cart-item-remove {
+  color: var(--kwetu-error);
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-left: 10px;
+}
+
+.kwetupizza-cart-total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  margin-top: 15px;
+  padding-top: 15px;
+  border-top: 1px solid #eee;
+}
+
+.kwetupizza-cart-total-amount {
+  color: var(--kwetu-primary);
+}
+
+.kwetupizza-checkout-button {
+  width: 100%;
+  background-color: var(--kwetu-secondary);
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 4px;
+  margin-top: 15px;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+  font-weight: 500;
+}
+
+.kwetupizza-checkout-button:hover {
+  background-color: var(--kwetu-secondary-dark);
+}
+
+.kwetupizza-checkout-button:disabled {
+  background-color: #ccc;
+  cursor: not-allowed;
+}
+
+/* Checkout Modal */
+.kwetupizza-modal {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.kwetupizza-modal-content {
+  background-color: white;
+  margin: 5% auto;
+  padding: 20px;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 600px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: kwetupizza-modal-appear 0.3s ease;
+}
+
+@keyframes kwetupizza-modal-appear {
+  from {
+    opacity: 0;
+    transform: translateY(-50px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.kwetupizza-modal-close {
+  float: right;
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+  color: #aaa;
+}
+
+.kwetupizza-modal-close:hover {
+  color: #333;
+}
+
+.kwetupizza-form-group {
+  margin-bottom: 20px;
+}
+
+.kwetupizza-form-group label {
+  display: block;
+  margin-bottom: 5px;
+  font-weight: 500;
+}
+
+.kwetupizza-form-group input,
+.kwetupizza-form-group textarea,
+.kwetupizza-form-group select {
+  width: 100%;
+  padding: 10px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.kwetupizza-order-summary {
+  background-color: #f9f9f9;
+  padding: 15px;
+  border-radius: 6px;
+  margin-top: 20px;
+  margin-bottom: 20px;
+}
+
+.kwetupizza-summary-items {
+  margin-bottom: 10px;
+}
+
+.kwetupizza-summary-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 5px 0;
+}
+
+.kwetupizza-summary-total {
+  display: flex;
+  justify-content: space-between;
+  font-weight: bold;
+  padding-top: 10px;
+  border-top: 1px solid #ddd;
+}
+
+.kwetupizza-place-order-button {
+  background-color: var(--kwetu-secondary);
+  color: white;
+  border: none;
+  width: 100%;
+  padding: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: background-color 0.3s ease;
+}
+
+.kwetupizza-place-order-button:hover {
+  background-color: var(--kwetu-secondary-dark);
+}
+
+/* Responsive Adjustments */
+@media (max-width: 992px) {
+  .kwetupizza-menu-container {
+    flex-direction: column;
+  }
+  
+  .kwetupizza-menu-filters {
+    max-width: 100%;
+  }
+  
+  .kwetupizza-menu-filters ul {
+    display: flex;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-bottom: 5px;
+  }
+  
+  .kwetupizza-menu-filters li {
+    border-bottom: none;
+    border-right: 1px solid #eee;
+  }
+  
+  .kwetupizza-cart {
+    position: relative;
+    top: 0;
+  }
+}
+
+@media (max-width: 576px) {
+  .kwetupizza-product-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .kwetupizza-modal-content {
+    width: 95%;
+    padding: 15px;
+  }
+} 

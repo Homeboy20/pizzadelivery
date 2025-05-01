@@ -1,0 +1,453 @@
+/**
+ * KwetuPizza Main Stylesheet
+ * 
+ * Contains global styles for the KwetuPizza plugin.
+ */
+
+:root {
+  --kwetu-primary: #ff5722;
+  --kwetu-primary-dark: #e64a19;
+  --kwetu-secondary: #4caf50;
+  --kwetu-secondary-dark: #388e3c;
+  --kwetu-text: #333333;
+  --kwetu-light-text: #757575;
+  --kwetu-background: #ffffff;
+  --kwetu-light-background: #f5f5f5;
+  --kwetu-border: #e0e0e0;
+  --kwetu-success: #4caf50;
+  --kwetu-warning: #ff9800;
+  --kwetu-error: #f44336;
+  --kwetu-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --kwetu-transition: all 0.3s ease;
+}
+
+/* Reset and Base Styles */
+.kwetupizza-container * {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+.kwetupizza-container {
+  font-family: 'Poppins', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
+  color: var(--kwetu-text);
+  line-height: 1.6;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+/* Typography */
+.kwetupizza-container h1,
+.kwetupizza-container h2,
+.kwetupizza-container h3,
+.kwetupizza-container h4,
+.kwetupizza-container h5,
+.kwetupizza-container h6 {
+  margin-bottom: 0.5em;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.kwetupizza-container h1 {
+  font-size: 2.5rem;
+  color: var(--kwetu-primary);
+}
+
+.kwetupizza-container h2 {
+  font-size: 2rem;
+  border-bottom: 2px solid var(--kwetu-primary);
+  padding-bottom: 0.3em;
+  margin-bottom: 0.8em;
+}
+
+.kwetupizza-container h3 {
+  font-size: 1.5rem;
+  color: var(--kwetu-text);
+}
+
+.kwetupizza-container p {
+  margin-bottom: 1em;
+}
+
+/* Buttons */
+.kwetupizza-btn {
+  display: inline-block;
+  background-color: var(--kwetu-primary);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 10px 20px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: var(--kwetu-transition);
+  text-decoration: none;
+  text-align: center;
+}
+
+.kwetupizza-btn:hover {
+  background-color: var(--kwetu-primary-dark);
+}
+
+.kwetupizza-btn:focus {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 87, 34, 0.3);
+}
+
+.kwetupizza-btn:disabled {
+  background-color: #ddd;
+  cursor: not-allowed;
+}
+
+.kwetupizza-btn-secondary {
+  background-color: var(--kwetu-secondary);
+}
+
+.kwetupizza-btn-secondary:hover {
+  background-color: var(--kwetu-secondary-dark);
+}
+
+.kwetupizza-btn-outline {
+  background-color: transparent;
+  border: 2px solid var(--kwetu-primary);
+  color: var(--kwetu-primary);
+}
+
+.kwetupizza-btn-outline:hover {
+  background-color: var(--kwetu-primary);
+  color: white;
+}
+
+.kwetupizza-btn-sm {
+  padding: 6px 12px;
+  font-size: 0.875rem;
+}
+
+.kwetupizza-btn-lg {
+  padding: 12px 24px;
+  font-size: 1.125rem;
+}
+
+/* Form Elements */
+.kwetupizza-form-group {
+  margin-bottom: 1.5rem;
+}
+
+.kwetupizza-form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-weight: 500;
+}
+
+.kwetupizza-form-control {
+  width: 100%;
+  padding: 10px 15px;
+  font-size: 1rem;
+  border: 1px solid var(--kwetu-border);
+  border-radius: 4px;
+  transition: var(--kwetu-transition);
+}
+
+.kwetupizza-form-control:focus {
+  border-color: var(--kwetu-primary);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 87, 34, 0.2);
+}
+
+.kwetupizza-form-control::placeholder {
+  color: #aaa;
+}
+
+.kwetupizza-form-control.is-invalid {
+  border-color: var(--kwetu-error);
+}
+
+.kwetupizza-form-feedback {
+  font-size: 0.875rem;
+  margin-top: 0.25rem;
+}
+
+.kwetupizza-form-feedback.invalid-feedback {
+  color: var(--kwetu-error);
+}
+
+textarea.kwetupizza-form-control {
+  min-height: 100px;
+}
+
+select.kwetupizza-form-control {
+  appearance: none;
+  background-image: url("data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23333' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  padding-right: 30px;
+}
+
+/* Card Styles */
+.kwetupizza-card {
+  background-color: var(--kwetu-background);
+  border-radius: 8px;
+  box-shadow: var(--kwetu-shadow);
+  margin-bottom: 20px;
+  overflow: hidden;
+  transition: var(--kwetu-transition);
+}
+
+.kwetupizza-card:hover {
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  transform: translateY(-2px);
+}
+
+.kwetupizza-card-header {
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--kwetu-border);
+  background-color: var(--kwetu-light-background);
+}
+
+.kwetupizza-card-body {
+  padding: 20px;
+}
+
+.kwetupizza-card-footer {
+  padding: 15px 20px;
+  border-top: 1px solid var(--kwetu-border);
+  background-color: var(--kwetu-light-background);
+}
+
+/* Grid System */
+.kwetupizza-row {
+  display: flex;
+  flex-wrap: wrap;
+  margin-right: -15px;
+  margin-left: -15px;
+}
+
+.kwetupizza-col {
+  position: relative;
+  width: 100%;
+  padding-right: 15px;
+  padding-left: 15px;
+}
+
+@media (min-width: 576px) {
+  .kwetupizza-col-sm-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+}
+
+@media (min-width: 768px) {
+  .kwetupizza-col-md-4 {
+    flex: 0 0 33.333333%;
+    max-width: 33.333333%;
+  }
+  
+  .kwetupizza-col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+  
+  .kwetupizza-col-md-8 {
+    flex: 0 0 66.666667%;
+    max-width: 66.666667%;
+  }
+}
+
+@media (min-width: 992px) {
+  .kwetupizza-col-lg-3 {
+    flex: 0 0 25%;
+    max-width: 25%;
+  }
+  
+  .kwetupizza-col-lg-4 {
+    flex: 0 0 33.333333%;
+    max-width: 33.333333%;
+  }
+  
+  .kwetupizza-col-lg-8 {
+    flex: 0 0 66.666667%;
+    max-width: 66.666667%;
+  }
+  
+  .kwetupizza-col-lg-9 {
+    flex: 0 0 75%;
+    max-width: 75%;
+  }
+}
+
+/* Helper Classes */
+.kwetupizza-text-center {
+  text-align: center;
+}
+
+.kwetupizza-text-right {
+  text-align: right;
+}
+
+.kwetupizza-text-primary {
+  color: var(--kwetu-primary);
+}
+
+.kwetupizza-bg-light {
+  background-color: var(--kwetu-light-background);
+}
+
+.kwetupizza-mt-3 {
+  margin-top: 1rem;
+}
+
+.kwetupizza-mb-3 {
+  margin-bottom: 1rem;
+}
+
+.kwetupizza-p-3 {
+  padding: 1rem;
+}
+
+.kwetupizza-d-flex {
+  display: flex;
+}
+
+.kwetupizza-justify-content-between {
+  justify-content: space-between;
+}
+
+.kwetupizza-align-items-center {
+  align-items: center;
+}
+
+/* Alert Messages */
+.kwetupizza-alert {
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+}
+
+.kwetupizza-alert-success {
+  color: #155724;
+  background-color: #d4edda;
+  border-color: #c3e6cb;
+}
+
+.kwetupizza-alert-warning {
+  color: #856404;
+  background-color: #fff3cd;
+  border-color: #ffeeba;
+}
+
+.kwetupizza-alert-danger {
+  color: #721c24;
+  background-color: #f8d7da;
+  border-color: #f5c6cb;
+}
+
+.kwetupizza-alert-info {
+  color: #0c5460;
+  background-color: #d1ecf1;
+  border-color: #bee5eb;
+}
+
+/* Loader Animation */
+.kwetupizza-loader {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 4px solid rgba(255, 87, 34, 0.3);
+  border-radius: 50%;
+  border-top-color: var(--kwetu-primary);
+  animation: kwetupizza-spin 1s linear infinite;
+}
+
+@keyframes kwetupizza-spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* Modal Styles */
+.kwetupizza-modal {
+  display: none;
+  position: fixed;
+  z-index: 9999;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0, 0, 0, 0.5);
+}
+
+.kwetupizza-modal-content {
+  position: relative;
+  background-color: var(--kwetu-background);
+  margin: 10vh auto;
+  padding: 20px;
+  border-radius: 8px;
+  width: 80%;
+  max-width: 600px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  animation: kwetupizza-modal-in 0.3s;
+}
+
+.kwetupizza-modal-close {
+  position: absolute;
+  right: 20px;
+  top: 15px;
+  color: var(--kwetu-light-text);
+  font-size: 28px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.kwetupizza-modal-close:hover {
+  color: var(--kwetu-text);
+}
+
+.kwetupizza-modal-header {
+  border-bottom: 1px solid var(--kwetu-border);
+  padding-bottom: 15px;
+  margin-bottom: 15px;
+}
+
+.kwetupizza-modal-footer {
+  border-top: 1px solid var(--kwetu-border);
+  padding-top: 15px;
+  margin-top: 15px;
+  text-align: right;
+}
+
+@keyframes kwetupizza-modal-in {
+  from { opacity: 0; transform: translateY(-50px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Responsive Designs */
+@media (max-width: 768px) {
+  .kwetupizza-container {
+    padding: 15px;
+  }
+  
+  .kwetupizza-modal-content {
+    width: 95%;
+    margin: 5vh auto;
+  }
+}
+
+/* Print Styles */
+@media print {
+  .kwetupizza-container {
+    padding: 0;
+  }
+  
+  .kwetupizza-btn,
+  .kwetupizza-modal-close,
+  .no-print {
+    display: none !important;
+  }
+  
+  .kwetupizza-card {
+    box-shadow: none;
+    border: 1px solid #ddd;
+  }
+} 
