@@ -19,132 +19,132 @@ if (!defined('ABSPATH')) {
  * Create custom database tables
  */
 if (!function_exists('kwetupizza_create_tables')) {
-    function kwetupizza_create_tables() {
-        global $wpdb;
-        $charset_collate = $wpdb->get_charset_collate();
+function kwetupizza_create_tables() {
+    global $wpdb;
+    $charset_collate = $wpdb->get_charset_collate();
 
         // Include WordPress upgrade functions
         require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
 
-        // Users Table
-        $users_table = $wpdb->prefix . 'kwetupizza_users';
-        $sql = "CREATE TABLE IF NOT EXISTS $users_table (
-            id mediumint(9) NOT NULL AUTO_INCREMENT,
-            name varchar(100) NOT NULL,
-            email varchar(100) NOT NULL,
-            phone varchar(20) NOT NULL,
-            role varchar(20) NOT NULL,
-            state varchar(255) DEFAULT 'greeting' NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            UNIQUE KEY phone (phone),
-            PRIMARY KEY  (id)
-        ) $charset_collate;";
-        dbDelta($sql);
+    // Users Table
+    $users_table = $wpdb->prefix . 'kwetupizza_users';
+    $sql = "CREATE TABLE IF NOT EXISTS $users_table (
+        id mediumint(9) NOT NULL AUTO_INCREMENT,
+        name varchar(100) NOT NULL,
+        email varchar(100) NOT NULL,
+        phone varchar(20) NOT NULL,
+        role varchar(20) NOT NULL,
+        state varchar(255) DEFAULT 'greeting' NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        UNIQUE KEY phone (phone),
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+    dbDelta($sql);
 
-        // Products Table
-        $products_table = $wpdb->prefix . 'kwetupizza_products';
-        $sql = "CREATE TABLE IF NOT EXISTS $products_table (
-            id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
-            product_name varchar(255) NOT NULL,
-            description text NOT NULL,
-            price float NOT NULL,
-            currency varchar(10) NOT NULL,
-            category varchar(50) NOT NULL,
-            image_url varchar(255) DEFAULT '',
-            stock_status varchar(50) DEFAULT 'in_stock',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id)
-        ) $charset_collate;";
-        dbDelta($sql);
+    // Products Table
+    $products_table = $wpdb->prefix . 'kwetupizza_products';
+    $sql = "CREATE TABLE IF NOT EXISTS $products_table (
+        id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
+        product_name varchar(255) NOT NULL,
+        description text NOT NULL,
+        price float NOT NULL,
+        currency varchar(10) NOT NULL,
+        category varchar(50) NOT NULL,
+        image_url varchar(255) DEFAULT '',
+        stock_status varchar(50) DEFAULT 'in_stock',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+    dbDelta($sql);
 
-        // Orders Table
-        $orders_table = $wpdb->prefix . 'kwetupizza_orders';
-        $sql = "CREATE TABLE IF NOT EXISTS $orders_table (
-            id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
-            order_date datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
-            customer_name varchar(100) NOT NULL,
-            customer_phone varchar(20) NOT NULL,
-            customer_email varchar(100) DEFAULT '',
-            delivery_address text NOT NULL,
-            delivery_phone varchar(20) NOT NULL,
-            status varchar(50) NOT NULL,
-            total float NOT NULL,
-            currency varchar(10) NOT NULL,
-            delivery_notes text DEFAULT '',
-            estimated_delivery_time datetime,
-            created_at timestamp DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id)
-        ) $charset_collate;";
-        dbDelta($sql);
+    // Orders Table
+    $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+    $sql = "CREATE TABLE IF NOT EXISTS $orders_table (
+        id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
+        order_date datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        customer_name varchar(100) NOT NULL,
+        customer_phone varchar(20) NOT NULL,
+        customer_email varchar(100) DEFAULT '',
+        delivery_address text NOT NULL,
+        delivery_phone varchar(20) NOT NULL,
+        status varchar(50) NOT NULL,
+        total float NOT NULL,
+        currency varchar(10) NOT NULL,
+        delivery_notes text DEFAULT '',
+        estimated_delivery_time datetime,
+        created_at timestamp DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+    dbDelta($sql);
 
-        // Order Items Table
-        $order_items_table = $wpdb->prefix . 'kwetupizza_order_items';
-        $sql = "CREATE TABLE IF NOT EXISTS $order_items_table (
-            id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
-            order_id mediumint(9) UNSIGNED NOT NULL,
-            product_id mediumint(9) UNSIGNED NOT NULL,
-            quantity int NOT NULL,
-            price float NOT NULL,
-            special_instructions text DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            FOREIGN KEY (order_id) REFERENCES {$orders_table}(id) ON DELETE CASCADE,
-            FOREIGN KEY (product_id) REFERENCES {$products_table}(id) ON DELETE CASCADE
-        ) $charset_collate;";
-        dbDelta($sql);
+    // Order Items Table
+    $order_items_table = $wpdb->prefix . 'kwetupizza_order_items';
+    $sql = "CREATE TABLE IF NOT EXISTS $order_items_table (
+        id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
+        order_id mediumint(9) UNSIGNED NOT NULL,
+        product_id mediumint(9) UNSIGNED NOT NULL,
+        quantity int NOT NULL,
+        price float NOT NULL,
+        special_instructions text DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
+        FOREIGN KEY (order_id) REFERENCES {$orders_table}(id) ON DELETE CASCADE,
+        FOREIGN KEY (product_id) REFERENCES {$products_table}(id) ON DELETE CASCADE
+    ) $charset_collate;";
+    dbDelta($sql);
 
-        // Transactions Table
-        $transactions_table = $wpdb->prefix . 'kwetupizza_transactions';
-        $sql = "CREATE TABLE IF NOT EXISTS $transactions_table (
-            id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
-            order_id mediumint(9) UNSIGNED NOT NULL,
-            transaction_date datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
-            payment_method varchar(50) NOT NULL,
-            payment_status varchar(50) NOT NULL,
-            amount float NOT NULL,
-            currency varchar(10) NOT NULL,
-            payment_provider varchar(50) NOT NULL,
-            transaction_reference varchar(100) DEFAULT '',
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            FOREIGN KEY (order_id) REFERENCES {$wpdb->prefix}kwetupizza_orders(id) ON DELETE CASCADE
-        ) $charset_collate;";
-        dbDelta($sql);
+    // Transactions Table
+    $transactions_table = $wpdb->prefix . 'kwetupizza_transactions';
+    $sql = "CREATE TABLE IF NOT EXISTS $transactions_table (
+        id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
+        order_id mediumint(9) UNSIGNED NOT NULL,
+        transaction_date datetime DEFAULT CURRENT_TIMESTAMP NOT NULL,
+        payment_method varchar(50) NOT NULL,
+        payment_status varchar(50) NOT NULL,
+        amount float NOT NULL,
+        currency varchar(10) NOT NULL,
+        payment_provider varchar(50) NOT NULL,
+        transaction_reference varchar(100) DEFAULT '',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
+        FOREIGN KEY (order_id) REFERENCES {$wpdb->prefix}kwetupizza_orders(id) ON DELETE CASCADE
+    ) $charset_collate;";
+    dbDelta($sql);
 
-        // Delivery Zones Table (New)
-        $delivery_zones_table = $wpdb->prefix . 'kwetupizza_delivery_zones';
-        $sql = "CREATE TABLE IF NOT EXISTS $delivery_zones_table (
-            id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
-            zone_name varchar(100) NOT NULL,
-            description text DEFAULT '',
-            coordinates text NOT NULL,
-            delivery_fee float NOT NULL,
-            min_delivery_time int DEFAULT 30,
-            max_delivery_time int DEFAULT 60,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id)
-        ) $charset_collate;";
-        dbDelta($sql);
+    // Delivery Zones Table (New)
+    $delivery_zones_table = $wpdb->prefix . 'kwetupizza_delivery_zones';
+    $sql = "CREATE TABLE IF NOT EXISTS $delivery_zones_table (
+        id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
+        zone_name varchar(100) NOT NULL,
+        description text DEFAULT '',
+        coordinates text NOT NULL,
+        delivery_fee float NOT NULL,
+        min_delivery_time int DEFAULT 30,
+        max_delivery_time int DEFAULT 60,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id)
+    ) $charset_collate;";
+    dbDelta($sql);
 
-        // Customer Loyalty Table (New)
-        $customer_loyalty_table = $wpdb->prefix . 'kwetupizza_customer_loyalty';
-        $sql = "CREATE TABLE IF NOT EXISTS $customer_loyalty_table (
-            id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
-            customer_phone varchar(20) NOT NULL,
-            points int DEFAULT 0,
-            total_orders int DEFAULT 0,
-            total_spent float DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            UNIQUE KEY (customer_phone)
-        ) $charset_collate;";
-        dbDelta($sql);
+    // Customer Loyalty Table (New)
+    $customer_loyalty_table = $wpdb->prefix . 'kwetupizza_customer_loyalty';
+    $sql = "CREATE TABLE IF NOT EXISTS $customer_loyalty_table (
+        id mediumint(9) UNSIGNED NOT NULL AUTO_INCREMENT,
+        customer_phone varchar(20) NOT NULL,
+        points int DEFAULT 0,
+        total_orders int DEFAULT 0,
+        total_spent float DEFAULT 0,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        PRIMARY KEY  (id),
+        UNIQUE KEY (customer_phone)
+    ) $charset_collate;";
+    dbDelta($sql);
     }
 }
 
@@ -156,65 +156,65 @@ if (!function_exists('kwetupizza_create_tables')) {
  * Create required pages for the plugin
  */
 if (!function_exists('kwetupizza_create_pages')) {
-    function kwetupizza_create_pages() {
-        // Create Thank You page
+function kwetupizza_create_pages() {
+    // Create Thank You page
         $thank_you_page = get_page_by_path('thank-you');
         if (empty($thank_you_page)) {
-            wp_insert_post(array(
-                'post_title' => 'Thank You',
-                'post_content' => 'Thank you for your order! Your payment was successful.',
-                'post_name' => 'thank-you',
-                'post_status' => 'publish',
-                'post_type' => 'page',
-            ));
-        }
+        wp_insert_post(array(
+            'post_title' => 'Thank You',
+            'post_content' => 'Thank you for your order! Your payment was successful.',
+            'post_name' => 'thank-you',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+        ));
+    }
 
-        // Create Retry Payment page
+    // Create Retry Payment page
         $retry_payment_page = get_page_by_path('retry-payment');
         if (empty($retry_payment_page)) {
-            wp_insert_post(array(
-                'post_title' => 'Retry Payment',
-                'post_content' => 'It seems your payment has failed. Please retry the payment by clicking the link below.',
-                'post_name' => 'retry-payment',
-                'post_status' => 'publish',
-                'post_type' => 'page',
-            ));
-        }
+        wp_insert_post(array(
+            'post_title' => 'Retry Payment',
+            'post_content' => 'It seems your payment has failed. Please retry the payment by clicking the link below.',
+            'post_name' => 'retry-payment',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+        ));
+    }
 
-        // Create Order Tracking page (New)
+    // Create Order Tracking page (New)
         $order_tracking_page = get_page_by_path('order-tracking');
         if (empty($order_tracking_page)) {
-            wp_insert_post(array(
-                'post_title' => 'Order Tracking',
-                'post_content' => '[kwetupizza_order_tracking]',
-                'post_name' => 'order-tracking',
-                'post_status' => 'publish',
-                'post_type' => 'page',
-            ));
-        }
+        wp_insert_post(array(
+            'post_title' => 'Order Tracking',
+            'post_content' => '[kwetupizza_order_tracking]',
+            'post_name' => 'order-tracking',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+        ));
+    }
 
-        // Create Menu page (New)
+    // Create Menu page (New)
         $menu_page = get_page_by_path('pizza-menu');
         if (empty($menu_page)) {
-            wp_insert_post(array(
-                'post_title' => 'Our Menu',
-                'post_content' => '[kwetupizza_menu]',
-                'post_name' => 'pizza-menu',
-                'post_status' => 'publish',
-                'post_type' => 'page',
-            ));
-        }
+        wp_insert_post(array(
+            'post_title' => 'Our Menu',
+            'post_content' => '[kwetupizza_menu]',
+            'post_name' => 'pizza-menu',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+        ));
+    }
 
-        // Create Customer Account page (New)
+    // Create Customer Account page (New)
         $account_page = get_page_by_path('customer-account');
         if (empty($account_page)) {
-            wp_insert_post(array(
-                'post_title' => 'My Account',
-                'post_content' => '[kwetupizza_customer_account]',
-                'post_name' => 'customer-account',
-                'post_status' => 'publish',
-                'post_type' => 'page',
-            ));
+        wp_insert_post(array(
+            'post_title' => 'My Account',
+            'post_content' => '[kwetupizza_customer_account]',
+            'post_name' => 'customer-account',
+            'post_status' => 'publish',
+            'post_type' => 'page',
+        ));
         }
     }
 }
@@ -259,7 +259,7 @@ function kwetupizza_sanitize_phone($phone) {
     if (substr($phone, 0, 3) !== '255') {
         // If number starts with 0, replace it with 255
         if (substr($phone, 0, 1) === '0') {
-            $phone = '255' . substr($phone, 1);
+        $phone = '255' . substr($phone, 1);
         } else {
             // Otherwise assume it's a local number and add country code
             $phone = '255' . $phone;
@@ -347,7 +347,7 @@ function kwetupizza_send_whatsapp_message($phone, $message) {
     
     // WhatsApp Cloud API endpoint
     $url = "https://graph.facebook.com/v17.0/{$phone_id}/messages";
-    
+
     // Setup the request payload
     $data = array(
         'messaging_product' => 'whatsapp',
@@ -369,7 +369,7 @@ function kwetupizza_send_whatsapp_message($phone, $message) {
         'body' => json_encode($data),
         'timeout' => 30
     ));
-    
+
     // Check for errors
     if (is_wp_error($response)) {
         error_log('WhatsApp API Error: ' . $response->get_error_message());

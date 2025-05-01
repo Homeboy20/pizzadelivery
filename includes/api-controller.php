@@ -82,18 +82,18 @@ if (!function_exists('kwetupizza_register_api_routes')) {
  * Handle WhatsApp webhook verification
  */
 if (!function_exists('kwetupizza_handle_whatsapp_verification')) {
-    function kwetupizza_handle_whatsapp_verification(WP_REST_Request $request) {
-        $verify_token = get_option('kwetupizza_whatsapp_verify_token');
+function kwetupizza_handle_whatsapp_verification(WP_REST_Request $request) {
+    $verify_token = get_option('kwetupizza_whatsapp_verify_token');
         
-        $mode = $request->get_param('hub_mode');
-        $token = $request->get_param('hub_verify_token');
-        $challenge = $request->get_param('hub_challenge');
-        
-        if ($mode === 'subscribe' && $token === $verify_token) {
-            return new WP_REST_Response($challenge, 200);
-        }
-        
-        return new WP_REST_Response('Verification failed', 403);
+    $mode = $request->get_param('hub_mode');
+    $token = $request->get_param('hub_verify_token');
+    $challenge = $request->get_param('hub_challenge');
+    
+    if ($mode === 'subscribe' && $token === $verify_token) {
+        return new WP_REST_Response($challenge, 200);
+    }
+    
+    return new WP_REST_Response('Verification failed', 403);
     }
 }
 
@@ -101,7 +101,7 @@ if (!function_exists('kwetupizza_handle_whatsapp_verification')) {
  * Handle NextSMS webhook
  */
 if (!function_exists('kwetupizza_nextsms_webhook')) {
-    function kwetupizza_nextsms_webhook(WP_REST_Request $request) {
+function kwetupizza_nextsms_webhook(WP_REST_Request $request) {
         $params = $request->get_params();
         
         kwetupizza_log('NextSMS webhook received: ' . json_encode($params), 'info', 'nextsms-webhook.log');
@@ -110,40 +110,40 @@ if (!function_exists('kwetupizza_nextsms_webhook')) {
         if (isset($params['status']) && isset($params['messageId'])) {
             // Update delivery status in your database
             return new WP_REST_Response('SMS status processed', 200);
-        }
-        
+}
+
         return new WP_REST_Response('Invalid data', 400);
-    }
+        }
 }
 
 /**
  * Track order API endpoint
  */
 if (!function_exists('kwetupizza_track_order_api')) {
-    function kwetupizza_track_order_api(WP_REST_Request $request) {
-        $order_id = $request->get_param('order_id');
-        
-        global $wpdb;
-        $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+function kwetupizza_track_order_api(WP_REST_Request $request) {
+    $order_id = $request->get_param('order_id');
+    
+    global $wpdb;
+    $orders_table = $wpdb->prefix . 'kwetupizza_orders';
         $timeline_table = $wpdb->prefix . 'kwetupizza_order_timeline';
         
         $order = $wpdb->get_row($wpdb->prepare("SELECT * FROM $orders_table WHERE id = %d", $order_id));
-        
-        if (!$order) {
+    
+    if (!$order) {
             return new WP_REST_Response(['error' => 'Order not found'], 404);
-        }
-        
+    }
+    
         $timeline = $wpdb->get_results($wpdb->prepare(
             "SELECT event_type, description, created_at FROM $timeline_table WHERE order_id = %d ORDER BY created_at ASC",
-            $order_id
-        ));
-        
+        $order_id
+    ));
+    
         $data = [
-            'order' => [
-                'id' => $order->id,
-                'status' => $order->status,
-                'customer_name' => $order->customer_name,
-                'delivery_address' => $order->delivery_address,
+        'order' => [
+            'id' => $order->id,
+            'status' => $order->status,
+            'customer_name' => $order->customer_name,
+            'delivery_address' => $order->delivery_address,
                 'total' => $order->total,
                 'currency' => $order->currency,
                 'created_at' => $order->created_at,
@@ -160,21 +160,21 @@ if (!function_exists('kwetupizza_track_order_api')) {
  * Get customer loyalty information
  */
 if (!function_exists('kwetupizza_get_customer_loyalty')) {
-    function kwetupizza_get_customer_loyalty(WP_REST_Request $request) {
-        $phone = $request->get_param('phone');
-        
-        global $wpdb;
-        $loyalty_table = $wpdb->prefix . 'kwetupizza_customer_loyalty';
-        
+function kwetupizza_get_customer_loyalty(WP_REST_Request $request) {
+    $phone = $request->get_param('phone');
+    
+    global $wpdb;
+    $loyalty_table = $wpdb->prefix . 'kwetupizza_customer_loyalty';
+    
         $loyalty = $wpdb->get_row($wpdb->prepare(
             "SELECT * FROM $loyalty_table WHERE customer_phone = %s",
             $phone
-        ));
-        
+    ));
+    
         if (!$loyalty) {
             return new WP_REST_Response(['error' => 'Customer not found in loyalty program'], 404);
-        }
-        
+    }
+    
         $data = [
             'phone' => $phone,
             'points' => $loyalty->points,
@@ -184,5 +184,5 @@ if (!function_exists('kwetupizza_get_customer_loyalty')) {
         ];
         
         return new WP_REST_Response($data, 200);
-    }
+                }
 } 
