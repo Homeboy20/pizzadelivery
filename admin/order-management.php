@@ -40,6 +40,12 @@ function kwetupizza_render_order_management() {
                             <td><?php echo esc_html($order->status); ?></td>
                             <td>
                                 <button class="button edit-order" data-id="<?php echo esc_attr($order->id); ?>">Edit</button>
+                                <?php if ($order->status == 'processing' || $order->status == 'payment_confirmed'): ?>
+                                    <button class="button dispatch-order" data-id="<?php echo esc_attr($order->id); ?>">Dispatch</button>
+                                <?php endif; ?>
+                                <?php if ($order->status == 'dispatched'): ?>
+                                    <button class="button mark-delivered" data-id="<?php echo esc_attr($order->id); ?>">Mark Delivered</button>
+                                <?php endif; ?>
                                 <button class="button delete-order" data-id="<?php echo esc_attr($order->id); ?>">Delete</button>
                             </td>
                         </tr>
@@ -68,11 +74,27 @@ function kwetupizza_render_order_management() {
                 <label for="edit_status">Status:</label>
                 <select name="status" id="edit_status">
                     <option value="pending">Pending</option>
+                    <option value="processing">Processing</option>
+                    <option value="payment_confirmed">Payment Confirmed</option>
+                    <option value="dispatched">Dispatched</option>
+                    <option value="delivered">Delivered</option>
                     <option value="completed">Completed</option>
                     <option value="cancelled">Cancelled</option>
                 </select><br>
                 <button type="submit" class="button button-primary">Save Changes</button>
                 <button type="button" class="button" id="cancel-edit">Cancel</button>
+            </form>
+        </div>
+
+        <!-- Dispatch Order Modal -->
+        <div id="dispatch-order-modal" style="display: none;">
+            <h2>Dispatch Order</h2>
+            <form id="dispatch-order-form">
+                <input type="hidden" name="order_id" id="dispatch_order_id">
+                <label for="estimated_delivery_time">Estimated Delivery Time (minutes):</label>
+                <input type="number" name="estimated_delivery_time" id="estimated_delivery_time" min="5" max="120" value="30"><br>
+                <button type="submit" class="button button-primary">Dispatch Order & Notify Customer</button>
+                <button type="button" class="button" id="cancel-dispatch">Cancel</button>
             </form>
         </div>
     </div>
@@ -114,7 +136,7 @@ function kwetupizza_render_order_management() {
                 $.ajax({
                     url: ajaxurl,
                     method: 'POST',
-                    data: formData + '&action=kwetupizza_update_order',
+                    data: formData + '&action=kwetupizza_update_order&send_notification=true',
                     success: function(response) {
                         if (response.success) {
                             location.reload(); // Reload page to show updated data
@@ -128,6 +150,67 @@ function kwetupizza_render_order_management() {
             // Cancel Edit Order
             $('#cancel-edit').click(function() {
                 $('#edit-order-modal').hide(); // Hide the modal
+            });
+
+            // Dispatch Order button action
+            $('.dispatch-order').click(function() {
+                var orderId = $(this).data('id');
+                $('#dispatch_order_id').val(orderId);
+                $('#dispatch-order-modal').show();
+            });
+
+            // Submit dispatch order form
+            $('#dispatch-order-form').submit(function(e) {
+                e.preventDefault();
+                var orderId = $('#dispatch_order_id').val();
+                var estimatedTime = $('#estimated_delivery_time').val();
+                
+                $.ajax({
+                    url: ajaxurl,
+                    method: 'POST',
+                    data: {
+                        action: 'kwetupizza_dispatch_order',
+                        order_id: orderId,
+                        estimated_delivery_time: estimatedTime,
+                        _ajax_nonce: '<?php echo wp_create_nonce("kwetupizza_order_nonce"); ?>'
+                    },
+                    success: function(response) {
+                        if (response.success) {
+                            $('#dispatch-order-modal').hide();
+                            location.reload();
+                        } else {
+                            alert('Failed to dispatch order.');
+                        }
+                    }
+                });
+            });
+
+            // Cancel Dispatch
+            $('#cancel-dispatch').click(function() {
+                $('#dispatch-order-modal').hide();
+            });
+
+            // Mark as Delivered button action
+            $('.mark-delivered').click(function() {
+                var orderId = $(this).data('id');
+                if (confirm('Mark this order as delivered? This will notify the customer.')) {
+                    $.ajax({
+                        url: ajaxurl,
+                        method: 'POST',
+                        data: {
+                            action: 'kwetupizza_mark_delivered',
+                            order_id: orderId,
+                            _ajax_nonce: '<?php echo wp_create_nonce("kwetupizza_order_nonce"); ?>'
+                        },
+                        success: function(response) {
+                            if (response.success) {
+                                location.reload();
+                            } else {
+                                alert('Failed to mark order as delivered.');
+                            }
+                        }
+                    });
+                }
             });
 
             // Delete Order button action
@@ -187,8 +270,11 @@ function kwetupizza_update_order() {
     $delivery_address = sanitize_text_field($_POST['delivery_address']);
     $total = floatval($_POST['total']);
     $status = sanitize_text_field($_POST['status']);
+    $send_notification = isset($_POST['send_notification']) && $_POST['send_notification'] === 'true';
 
     $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+    
+    $previous_status = $wpdb->get_var($wpdb->prepare("SELECT status FROM $orders_table WHERE id = %d", $order_id));
 
     $updated = $wpdb->update(
         $orders_table,
@@ -198,12 +284,18 @@ function kwetupizza_update_order() {
             'delivery_address' => $delivery_address,
             'total' => $total,
             'status' => $status,
+            'updated_at' => current_time('mysql')
         ),
         array('id' => $order_id)
     );
 
     if ($updated !== false) {
-        wp_send_json_success();
+        // Send notification if status has changed and notifications are enabled
+        if ($send_notification && $previous_status !== $status) {
+            kwetupizza_notify_customer($order_id, $status);
+        }
+        
+        wp_send_json_success('Order updated successfully.');
     } else {
         wp_send_json_error('Failed to update order.');
     }
@@ -217,14 +309,58 @@ function kwetupizza_delete_order() {
     global $wpdb;
     $order_id = intval($_POST['order_id']);
     $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+    $order_items_table = $wpdb->prefix . 'kwetupizza_order_items';
 
+    // First delete order items
+    $wpdb->delete($order_items_table, array('order_id' => $order_id));
+    
+    // Then delete order
     $deleted = $wpdb->delete($orders_table, array('id' => $order_id));
 
-    if ($deleted !== false) {
-        wp_send_json_success();
+    if ($deleted) {
+        wp_send_json_success('Order deleted successfully.');
     } else {
         wp_send_json_error('Failed to delete order.');
     }
 }
 add_action('wp_ajax_kwetupizza_delete_order', 'kwetupizza_delete_order');
+
+// Ajax handler to dispatch order
+function kwetupizza_dispatch_order() {
+    check_ajax_referer('kwetupizza_order_nonce', '_ajax_nonce');
+    
+    $order_id = intval($_POST['order_id']);
+    $estimated_time = intval($_POST['estimated_delivery_time']);
+    
+    if (function_exists('kwetupizza_notify_order_dispatched')) {
+        $result = kwetupizza_notify_order_dispatched($order_id, $estimated_time);
+        if ($result) {
+            wp_send_json_success('Order dispatched successfully.');
+        } else {
+            wp_send_json_error('Failed to dispatch order.');
+        }
+    } else {
+        wp_send_json_error('Notification function not available.');
+    }
+}
+add_action('wp_ajax_kwetupizza_dispatch_order', 'kwetupizza_dispatch_order');
+
+// Ajax handler to mark order as delivered
+function kwetupizza_mark_delivered() {
+    check_ajax_referer('kwetupizza_order_nonce', '_ajax_nonce');
+    
+    $order_id = intval($_POST['order_id']);
+    
+    if (function_exists('kwetupizza_notify_order_delivered')) {
+        $result = kwetupizza_notify_order_delivered($order_id);
+        if ($result) {
+            wp_send_json_success('Order marked as delivered.');
+        } else {
+            wp_send_json_error('Failed to mark order as delivered.');
+        }
+    } else {
+        wp_send_json_error('Notification function not available.');
+    }
+}
+add_action('wp_ajax_kwetupizza_mark_delivered', 'kwetupizza_mark_delivered');
 ?>
