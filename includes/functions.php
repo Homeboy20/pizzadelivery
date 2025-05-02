@@ -2521,15 +2521,18 @@ if (!function_exists('kwetupizza_notify_order_delivered')) {
         $message .= "Hello {$order->customer_name},\n\n";
         $message .= "Your order has been delivered. We hope you enjoy your meal!\n\n";
         $message .= "We've added loyalty points to your account for this purchase.\n\n";
-        $message .= "Please rate your experience by replying with a number from 1-5 (5 being excellent).\n\n";
+        $message .= "You'll receive a message shortly to confirm your delivery and later to rate your experience.\n\n";
         $message .= "Thank you for choosing KwetuPizza! 🍕";
         
         // Send the notification
         $whatsapp_result = kwetupizza_send_whatsapp_message($order->customer_phone, $message);
         
         // Send SMS as backup
-        $sms_message = "KwetuPizza: Your order #$order_id has been delivered! Thank you for choosing us! Rate your experience by replying 1-5.";
+        $sms_message = "KwetuPizza: Your order #$order_id has been delivered! Thank you for choosing us!";
         $sms_result = kwetupizza_send_nextsms($order->customer_phone, $sms_message);
+        
+        // Send delivery confirmation request after 5 minutes
+        wp_schedule_single_event(time() + (5 * MINUTE_IN_SECONDS), 'kwetupizza_send_delivery_confirmation', [$order_id]);
         
         // Log the notification attempt
         if ($whatsapp_result || $sms_result) {
@@ -2758,3 +2761,248 @@ if (!function_exists('kwetupizza_process_streamlined_order')) {
         ];
     }
 }
+
+/**
+ * Send delivery confirmation link to customer
+ */
+if (!function_exists('kwetupizza_send_delivery_confirmation_request')) {
+    function kwetupizza_send_delivery_confirmation_request($order_id) {
+        global $wpdb;
+        $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+        
+        // Get order data
+        $order = $wpdb->get_row($wpdb->prepare(
+            "SELECT customer_name, customer_phone, delivery_address FROM $orders_table WHERE id = %d",
+            $order_id
+        ));
+        
+        if (!$order) {
+            kwetupizza_log("Failed to send delivery confirmation request for order ID: $order_id - Order not found", 'error');
+            return false;
+        }
+        
+        // Generate a unique confirmation token
+        $confirmation_token = md5('kwetupizza_order_' . $order_id . time());
+        
+        // Store the token in the order
+        $wpdb->update(
+            $orders_table,
+            [
+                'confirmation_token' => $confirmation_token,
+                'updated_at' => current_time('mysql')
+            ],
+            ['id' => $order_id]
+        );
+        
+        // Create confirmation link
+        $confirmation_link = home_url('/confirm-delivery/?order=' . $order_id . '&token=' . $confirmation_token);
+        
+        // Craft the WhatsApp message
+        $message = "🍕 *KwetuPizza Order Delivered* 🍕\n\n";
+        $message .= "Hello {$order->customer_name},\n\n";
+        $message .= "Your order #$order_id should have been delivered to you. Please confirm if you've received your order by clicking the link below:\n\n";
+        $message .= "$confirmation_link\n\n";
+        $message .= "Thank you for choosing KwetuPizza! 🍕";
+        
+        // Send the notification
+        $whatsapp_result = kwetupizza_send_whatsapp_message($order->customer_phone, $message);
+        
+        // Send SMS as backup
+        $sms_message = "KwetuPizza: Your order #$order_id should have been delivered. Please confirm: $confirmation_link";
+        $sms_result = kwetupizza_send_nextsms($order->customer_phone, $sms_message);
+        
+        // Log the notification attempt
+        if ($whatsapp_result || $sms_result) {
+            kwetupizza_log("Delivery confirmation request sent for order #$order_id", 'info');
+            
+            // Schedule feedback request after 30 minutes
+            wp_schedule_single_event(time() + (30 * MINUTE_IN_SECONDS), 'kwetupizza_send_customer_feedback_request', [$order_id]);
+            
+            return true;
+        } else {
+            kwetupizza_log("Failed to send delivery confirmation request for order #$order_id", 'error');
+            return false;
+        }
+    }
+}
+
+/**
+ * Handle delivery confirmation from customer
+ */
+if (!function_exists('kwetupizza_handle_delivery_confirmation')) {
+    function kwetupizza_handle_delivery_confirmation($order_id, $token) {
+        global $wpdb;
+        $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+        
+        // Verify the token
+        $valid_token = $wpdb->get_var($wpdb->prepare(
+            "SELECT confirmation_token FROM $orders_table WHERE id = %d",
+            $order_id
+        ));
+        
+        if (!$valid_token || $valid_token !== $token) {
+            return [
+                'success' => false,
+                'message' => 'Invalid or expired confirmation link.'
+            ];
+        }
+        
+        // Update order status to confirmed_delivered
+        $updated = $wpdb->update(
+            $orders_table,
+            [
+                'status' => 'confirmed_delivered',
+                'customer_confirmed_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql')
+            ],
+            ['id' => $order_id]
+        );
+        
+        if ($updated) {
+            // Add timeline event
+            kwetupizza_add_order_timeline_event($order_id, 'customer_confirmed', 'Customer confirmed delivery receipt');
+            
+            return [
+                'success' => true,
+                'message' => 'Thank you for confirming your delivery! We hope you enjoy your meal.'
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'Unable to confirm delivery. Please try again or contact support.'
+            ];
+        }
+    }
+}
+
+/**
+ * Send customer feedback request after delivery
+ */
+if (!function_exists('kwetupizza_send_customer_feedback_request')) {
+    function kwetupizza_send_customer_feedback_request($order_id) {
+        global $wpdb;
+        $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+        
+        // Get order data
+        $order = $wpdb->get_row($wpdb->prepare(
+            "SELECT customer_name, customer_phone, status FROM $orders_table WHERE id = %d",
+            $order_id
+        ));
+        
+        if (!$order) {
+            kwetupizza_log("Failed to send feedback request for order ID: $order_id - Order not found", 'error');
+            return false;
+        }
+        
+        // Only send if the order is delivered or confirmed_delivered
+        if ($order->status !== 'delivered' && $order->status !== 'confirmed_delivered') {
+            kwetupizza_log("Skipping feedback request for order #$order_id - Order status is {$order->status}", 'info');
+            return false;
+        }
+        
+        // Generate a unique feedback token
+        $feedback_token = md5('kwetupizza_feedback_' . $order_id . time());
+        
+        // Store the token in the order
+        $wpdb->update(
+            $orders_table,
+            [
+                'feedback_token' => $feedback_token,
+                'updated_at' => current_time('mysql')
+            ],
+            ['id' => $order_id]
+        );
+        
+        // Create feedback link
+        $feedback_link = home_url('/order-feedback/?order=' . $order_id . '&token=' . $feedback_token);
+        
+        // Craft the WhatsApp message
+        $message = "🌟 *How was your KwetuPizza experience?* 🌟\n\n";
+        $message .= "Hello {$order->customer_name},\n\n";
+        $message .= "We hope you enjoyed your meal! We'd love to hear your feedback about your recent order #$order_id.\n\n";
+        $message .= "Please rate your experience by visiting:\n$feedback_link\n\n";
+        $message .= "Your feedback helps us improve our service. Thank you for choosing KwetuPizza! 🍕";
+        
+        // Send the notification
+        $whatsapp_result = kwetupizza_send_whatsapp_message($order->customer_phone, $message);
+        
+        // Send SMS as backup
+        $sms_message = "KwetuPizza: How was your meal? Please rate your order #$order_id experience: $feedback_link";
+        $sms_result = kwetupizza_send_nextsms($order->customer_phone, $sms_message);
+        
+        // Log the notification attempt
+        if ($whatsapp_result || $sms_result) {
+            kwetupizza_log("Feedback request sent for order #$order_id", 'info');
+            return true;
+        } else {
+            kwetupizza_log("Failed to send feedback request for order #$order_id", 'error');
+            return false;
+        }
+    }
+}
+
+/**
+ * Save customer feedback
+ */
+if (!function_exists('kwetupizza_save_customer_feedback')) {
+    function kwetupizza_save_customer_feedback($order_id, $token, $rating, $comments = '') {
+        global $wpdb;
+        $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+        $feedback_table = $wpdb->prefix . 'kwetupizza_feedback';
+        
+        // Verify the token
+        $valid_token = $wpdb->get_var($wpdb->prepare(
+            "SELECT feedback_token FROM $orders_table WHERE id = %d",
+            $order_id
+        ));
+        
+        if (!$valid_token || $valid_token !== $token) {
+            return [
+                'success' => false,
+                'message' => 'Invalid or expired feedback link.'
+            ];
+        }
+        
+        // Save the feedback
+        $result = $wpdb->insert(
+            $feedback_table,
+            [
+                'order_id' => $order_id,
+                'rating' => $rating,
+                'comments' => $comments,
+                'created_at' => current_time('mysql')
+            ]
+        );
+        
+        if ($result) {
+            // Update order status to include feedback
+            $wpdb->update(
+                $orders_table,
+                [
+                    'has_feedback' => 1,
+                    'updated_at' => current_time('mysql')
+                ],
+                ['id' => $order_id]
+            );
+            
+            // Add timeline event
+            kwetupizza_add_order_timeline_event($order_id, 'customer_feedback', "Customer provided feedback (Rating: $rating/5)");
+            
+            return [
+                'success' => true,
+                'message' => 'Thank you for your feedback! We appreciate your input.'
+            ];
+        } else {
+            return [
+                'success' => false,
+                'message' => 'Unable to save your feedback. Please try again or contact support.'
+            ];
+        }
+    }
+}
+
+// Register the hook for sending feedback requests
+add_action('kwetupizza_send_customer_feedback_request', 'kwetupizza_send_customer_feedback_request');
+
+// Add a hook for sending delivery confirmation
+add_action('kwetupizza_send_delivery_confirmation', 'kwetupizza_send_delivery_confirmation_request');

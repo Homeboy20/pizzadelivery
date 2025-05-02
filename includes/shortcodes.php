@@ -17,6 +17,8 @@ function kwetupizza_register_shortcodes() {
     add_shortcode('kwetupizza_menu', 'kwetupizza_menu_shortcode');
     add_shortcode('kwetupizza_order_tracking', 'kwetupizza_order_tracking_shortcode');
     add_shortcode('kwetupizza_customer_account', 'kwetupizza_customer_account_shortcode');
+    add_shortcode('kwetupizza_confirm_delivery', 'kwetupizza_delivery_confirmation_shortcode');
+    add_shortcode('kwetupizza_feedback', 'kwetupizza_feedback_shortcode');
 }
 add_action('init', 'kwetupizza_register_shortcodes');
 
@@ -493,4 +495,303 @@ function kwetupizza_initiate_flutterwave_payment($order_id, $customer_name, $cus
 }
 
 // The kwetupizza_get_customer_email function is defined in includes/functions.php
-// and should not be redefined here to avoid PHP fatal errors. 
+// and should not be redefined here to avoid PHP fatal errors.
+
+/**
+ * Shortcode for the delivery confirmation page
+ */
+function kwetupizza_delivery_confirmation_shortcode() {
+    ob_start();
+    
+    $order_id = isset($_GET['order']) ? intval($_GET['order']) : 0;
+    $token = isset($_GET['token']) ? sanitize_text_field($_GET['token']) : '';
+    $confirmed = isset($_GET['confirmed']) && $_GET['confirmed'] == '1';
+    
+    if ($order_id && $token && !$confirmed && function_exists('kwetupizza_handle_delivery_confirmation')) {
+        $result = kwetupizza_handle_delivery_confirmation($order_id, $token);
+        
+        if ($result['success']) {
+            // Redirect to the same page with confirmed flag to prevent multiple confirmations
+            wp_redirect(add_query_arg('confirmed', '1', remove_query_arg(['order', 'token'])));
+            exit;
+        }
+    }
+    
+    ?>
+    <div class="kwetupizza-delivery-confirmation">
+        <?php if ($confirmed): ?>
+            <div class="confirmation-success">
+                <div class="icon-wrapper">
+                    <i class="dashicons dashicons-yes"></i>
+                </div>
+                <h2>Thank You!</h2>
+                <p>Your delivery has been confirmed. We hope you enjoy your meal!</p>
+                <p>You'll receive a request for feedback shortly to let us know about your experience.</p>
+            </div>
+        <?php elseif ($order_id && $token): ?>
+            <div class="confirmation-form">
+                <h2>Confirm Your Delivery</h2>
+                <p>Please confirm that you've received your order #<?php echo $order_id; ?>.</p>
+                
+                <?php if (isset($result) && !$result['success']): ?>
+                    <div class="error-message">
+                        <?php echo esc_html($result['message']); ?>
+                    </div>
+                <?php endif; ?>
+                
+                <form method="post">
+                    <input type="hidden" name="order_id" value="<?php echo esc_attr($order_id); ?>">
+                    <input type="hidden" name="token" value="<?php echo esc_attr($token); ?>">
+                    <button type="submit" class="button confirm-button">Yes, I've Received My Order</button>
+                </form>
+            </div>
+        <?php else: ?>
+            <div class="invalid-request">
+                <h2>Invalid Request</h2>
+                <p>Sorry, this confirmation link is invalid or has expired.</p>
+            </div>
+        <?php endif; ?>
+    </div>
+    
+    <style>
+        .kwetupizza-delivery-confirmation {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 30px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .confirmation-success .icon-wrapper {
+            width: 80px;
+            height: 80px;
+            background-color: #28a745;
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+        .confirmation-success .dashicons {
+            font-size: 40px;
+            width: 40px;
+            height: 40px;
+        }
+        .confirmation-form {
+            padding: 20px 0;
+        }
+        .confirm-button {
+            background-color: #28a745 !important;
+            color: #fff !important;
+            border: none !important;
+            padding: 12px 24px !important;
+            font-size: 16px !important;
+            border-radius: 4px !important;
+            cursor: pointer !important;
+            margin-top: 20px !important;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+    <?php
+    
+    return ob_get_clean();
+}
+
+/**
+ * Shortcode for the feedback form
+ */
+function kwetupizza_feedback_shortcode() {
+    ob_start();
+    
+    $order_id = isset($_GET['order']) ? intval($_GET['order']) : 0;
+    $token = isset($_GET['token']) ? sanitize_text_field($_GET['token']) : '';
+    $submitted = isset($_GET['submitted']) && $_GET['submitted'] == '1';
+    
+    // Process form submission
+    if (isset($_POST['submit_feedback']) && $order_id && $token && function_exists('kwetupizza_save_customer_feedback')) {
+        $rating = isset($_POST['rating']) ? intval($_POST['rating']) : 0;
+        $comments = isset($_POST['comments']) ? sanitize_textarea_field($_POST['comments']) : '';
+        
+        if ($rating >= 1 && $rating <= 5) {
+            $result = kwetupizza_save_customer_feedback($order_id, $token, $rating, $comments);
+            
+            if ($result['success']) {
+                // Redirect to the same page with submitted flag
+                wp_redirect(add_query_arg('submitted', '1', remove_query_arg(['order', 'token'])));
+                exit;
+            }
+        } else {
+            $error_message = 'Please select a rating between 1 and 5.';
+        }
+    }
+    
+    ?>
+    <div class="kwetupizza-feedback-form">
+        <?php if ($submitted): ?>
+            <div class="feedback-success">
+                <div class="icon-wrapper">
+                    <i class="dashicons dashicons-star-filled"></i>
+                </div>
+                <h2>Thank You for Your Feedback!</h2>
+                <p>We appreciate you taking the time to rate your experience with us.</p>
+                <p>Your feedback helps us improve our service for all customers.</p>
+            </div>
+        <?php elseif ($order_id && $token): ?>
+            <div class="feedback-form">
+                <h2>Rate Your Experience</h2>
+                <p>Please tell us about your recent order experience.</p>
+                
+                <?php if (isset($result) && !$result['success']): ?>
+                    <div class="error-message">
+                        <?php echo esc_html($result['message']); ?>
+                    </div>
+                <?php endif; ?>
+                
+                <?php if (isset($error_message)): ?>
+                    <div class="error-message">
+                        <?php echo esc_html($error_message); ?>
+                    </div>
+                <?php endif; ?>
+                
+                <form method="post">
+                    <div class="rating-container">
+                        <div class="rating">
+                            <input type="radio" id="star5" name="rating" value="5" /><label for="star5"></label>
+                            <input type="radio" id="star4" name="rating" value="4" /><label for="star4"></label>
+                            <input type="radio" id="star3" name="rating" value="3" /><label for="star3"></label>
+                            <input type="radio" id="star2" name="rating" value="2" /><label for="star2"></label>
+                            <input type="radio" id="star1" name="rating" value="1" /><label for="star1"></label>
+                        </div>
+                        <div class="rating-text">How would you rate your experience?</div>
+                    </div>
+                    
+                    <div class="comments-container">
+                        <label for="comments">Additional Comments (Optional)</label>
+                        <textarea name="comments" id="comments" rows="4" placeholder="Tell us what you liked or how we can improve..."></textarea>
+                    </div>
+                    
+                    <input type="hidden" name="order_id" value="<?php echo esc_attr($order_id); ?>">
+                    <input type="hidden" name="token" value="<?php echo esc_attr($token); ?>">
+                    <button type="submit" name="submit_feedback" class="button submit-button">Submit Feedback</button>
+                </form>
+            </div>
+        <?php else: ?>
+            <div class="invalid-request">
+                <h2>Invalid Request</h2>
+                <p>Sorry, this feedback link is invalid or has expired.</p>
+            </div>
+        <?php endif; ?>
+    </div>
+    
+    <style>
+        .kwetupizza-feedback-form {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 30px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        .feedback-success .icon-wrapper {
+            width: 80px;
+            height: 80px;
+            background-color: #ffc107;
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+        }
+        .feedback-success .dashicons {
+            font-size: 40px;
+            width: 40px;
+            height: 40px;
+        }
+        .feedback-form {
+            padding: 20px 0;
+        }
+        .rating-container {
+            margin: 20px 0;
+        }
+        .rating {
+            display: flex;
+            flex-direction: row-reverse;
+            justify-content: center;
+            margin-bottom: 10px;
+        }
+        .rating:not(:checked) > input {
+            position: absolute;
+            clip: rect(0,0,0,0);
+        }
+        .rating:not(:checked) > label {
+            float: right;
+            width: 1.2em;
+            overflow: hidden;
+            white-space: nowrap;
+            cursor: pointer;
+            font-size: 2em;
+            color: #ccc;
+        }
+        .rating:not(:checked) > label:before {
+            content: '★';
+        }
+        .rating > input:checked ~ label {
+            color: #ffc107;
+        }
+        .rating:not(:checked) > label:hover,
+        .rating:not(:checked) > label:hover ~ label {
+            color: #ffdb70;
+        }
+        .rating > input:checked + label:hover,
+        .rating > input:checked + label:hover ~ label,
+        .rating > input:checked ~ label:hover,
+        .rating > input:checked ~ label:hover ~ label,
+        .rating > label:hover ~ input:checked ~ label {
+            color: #ffd25e;
+        }
+        .comments-container {
+            margin: 20px 0;
+            text-align: left;
+        }
+        .comments-container label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .comments-container textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .submit-button {
+            background-color: #ffc107 !important;
+            color: #212529 !important;
+            border: none !important;
+            padding: 12px 24px !important;
+            font-size: 16px !important;
+            border-radius: 4px !important;
+            cursor: pointer !important;
+            margin-top: 20px !important;
+        }
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 20px;
+        }
+    </style>
+    <?php
+    
+    return ob_get_clean();
+} 
