@@ -18,7 +18,20 @@ define('KWETUPIZZA_VERSION', '2.0');
 define('KWETUPIZZA_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KWETUPIZZA_PLUGIN_URL', plugin_dir_url(__FILE__));
 
-// Include core functions
+// Remove any duplicate functions.php files
+if (file_exists(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_new.php')) {
+    unlink(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_new.php');
+}
+
+if (file_exists(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_part1.php')) {
+    unlink(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_part1.php');
+}
+
+if (file_exists(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_part2.php')) {
+    unlink(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_part2.php');
+}
+
+// Include core functions - ensure we're only loading the main functions file
 require_once KWETUPIZZA_PLUGIN_DIR . 'includes/functions.php';
 
 // Register CSS and JS
@@ -43,9 +56,7 @@ add_action('wp_enqueue_scripts', 'kwetupizza_enqueue_scripts');
 add_action('admin_enqueue_scripts', 'kwetupizza_enqueue_scripts');
 
 // Activation hooks
-register_activation_hook(__FILE__, 'kwetupizza_create_tables');
-register_activation_hook(__FILE__, 'kwetupizza_create_pages');
-register_activation_hook(__FILE__, 'kwetupizza_create_sample_delivery_zones');
+register_activation_hook(__FILE__, 'kwetupizza_activate');
 
 // Create menu in the WordPress dashboard
 function kwetupizza_create_menu() {
@@ -98,3 +109,52 @@ register_deactivation_hook(__FILE__, 'kwetupizza_deactivate');
 
 // Uninstall hook - not directly called but set up for WordPress to use
 register_uninstall_hook(__FILE__, 'kwetupizza_uninstall');
+
+function kwetupizza_activate() {
+    // Create necessary database tables
+    if (function_exists('kwetupizza_create_tables')) {
+        kwetupizza_create_tables();
+    }
+    
+    // Create required pages
+    if (function_exists('kwetupizza_create_pages')) {
+        kwetupizza_create_pages();
+    }
+    
+    // Add default delivery zones if needed
+    if (function_exists('kwetupizza_create_sample_delivery_zones')) {
+        kwetupizza_create_sample_delivery_zones();
+    }
+
+    // Set the plugin version
+    update_option('kwetupizza_version', KWETUPIZZA_VERSION);
+    
+    // Flush rewrite rules
+    flush_rewrite_rules();
+}
+
+function kwetupizza_deactivate() {
+    // Remove plugin options and clean up
+    delete_option('kwetupizza_version');
+}
+
+function kwetupizza_uninstall() {
+    // Remove plugin options and clean up
+    delete_option('kwetupizza_version');
+}
+
+function kwetupizza_check_database_update() {
+    $current_version = get_option('kwetupizza_version', '1.0.0');
+    
+    // If the version is different, we may need database updates
+    if (version_compare($current_version, KWETUPIZZA_VERSION, '<')) {
+        // Update tables if needed
+        if (function_exists('kwetupizza_create_tables')) {
+            kwetupizza_create_tables();
+        }
+        
+        // Update version in the database
+        update_option('kwetupizza_version', KWETUPIZZA_VERSION);
+    }
+}
+add_action('plugins_loaded', 'kwetupizza_check_database_update');
