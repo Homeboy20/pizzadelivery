@@ -341,19 +341,35 @@ add_action('send_headers', 'kwetupizza_add_security_headers');
  * Send WhatsApp message
  */
 function kwetupizza_send_whatsapp_message($phone, $message) {
+    // Log the attempt for debugging
+    kwetupizza_log("Attempting to send WhatsApp message to $phone", 'info', 'whatsapp.log');
+    
     $token = get_option('kwetupizza_whatsapp_token');
     $phone_id = get_option('kwetupizza_whatsapp_phone_id');
     
+    // Log configuration for troubleshooting
+    kwetupizza_log("WhatsApp configuration - Phone ID: $phone_id, Token exists: " . (!empty($token) ? 'Yes' : 'No'), 'info', 'whatsapp.log');
+    
     if (empty($token) || empty($phone_id)) {
-        error_log('WhatsApp API credentials not set');
+        kwetupizza_log('WhatsApp API credentials not set or incomplete', 'error', 'whatsapp.log');
         return false;
     }
     
-    // Sanitize phone number
+    // Sanitize phone number with enhanced validation
     $phone = kwetupizza_sanitize_phone($phone);
+    
+    // Log the sanitized phone number
+    kwetupizza_log("Sanitized phone number: $phone", 'info', 'whatsapp.log');
+    
+    // Ensure the phone number starts with country code and has no leading '+'
+    if (substr($phone, 0, 1) === '+') {
+        $phone = substr($phone, 1);
+        kwetupizza_log("Removed leading + from phone number: $phone", 'info', 'whatsapp.log');
+    }
     
     // WhatsApp Cloud API endpoint
     $url = "https://graph.facebook.com/v17.0/{$phone_id}/messages";
+    kwetupizza_log("Using WhatsApp endpoint: $url", 'info', 'whatsapp.log');
 
     // Setup the request payload
     $data = array(
@@ -367,6 +383,9 @@ function kwetupizza_send_whatsapp_message($phone, $message) {
         )
     );
     
+    // Log the payload for debugging
+    kwetupizza_log("WhatsApp payload: " . json_encode($data), 'info', 'whatsapp.log');
+    
     // Send the request
     $response = wp_remote_post($url, array(
         'headers' => array(
@@ -379,21 +398,28 @@ function kwetupizza_send_whatsapp_message($phone, $message) {
 
     // Check for errors
     if (is_wp_error($response)) {
-        error_log('WhatsApp API Error: ' . $response->get_error_message());
+        $error_message = $response->get_error_message();
+        kwetupizza_log("WhatsApp API Error: $error_message", 'error', 'whatsapp.log');
+        error_log("WhatsApp API Error: $error_message");
         return false;
     }
     
+    $status_code = wp_remote_retrieve_response_code($response);
     $body = json_decode(wp_remote_retrieve_body($response), true);
     
     // Log the response for debugging
-    error_log('WhatsApp API Response: ' . print_r($body, true));
+    kwetupizza_log("WhatsApp API Response Code: $status_code", 'info', 'whatsapp.log');
+    kwetupizza_log("WhatsApp API Response: " . print_r($body, true), 'info', 'whatsapp.log');
     
     // Check for successful response
     if (isset($body['messages']) && !empty($body['messages'])) {
+        kwetupizza_log("WhatsApp message sent successfully to $phone", 'info', 'whatsapp.log');
         return true;
+    } else {
+        $error_detail = isset($body['error']['message']) ? $body['error']['message'] : 'Unknown error';
+        kwetupizza_log("WhatsApp message failed: $error_detail", 'error', 'whatsapp.log');
+        return false;
     }
-    
-    return false;
 }
 
 /**
@@ -489,6 +515,8 @@ function kwetupizza_send_nextsms($phone, $message) {
  * Notify admin about new orders or payment status
  */
 function kwetupizza_notify_admin($order_id, $success = true) {
+    kwetupizza_log("Starting admin notification for order #$order_id", 'info', 'admin-notification.log');
+    
     global $wpdb;
     $orders_table = $wpdb->prefix . 'kwetupizza_orders';
     $order_items_table = $wpdb->prefix . 'kwetupizza_order_items';
@@ -496,6 +524,7 @@ function kwetupizza_notify_admin($order_id, $success = true) {
     $order = $wpdb->get_row($wpdb->prepare("SELECT * FROM $orders_table WHERE id = %d", $order_id));
     
     if (!$order) {
+        kwetupizza_log("Failed to find order #$order_id for admin notification", 'error', 'admin-notification.log');
         return false;
     }
     
@@ -509,6 +538,8 @@ function kwetupizza_notify_admin($order_id, $success = true) {
     ));
     
     $admin_phone = get_option('kwetupizza_admin_whatsapp');
+    kwetupizza_log("Admin WhatsApp number from settings: $admin_phone", 'info', 'admin-notification.log');
+    
     $status = $success ? 'successful' : 'failed';
     
     $message = $success ? "✅ PAYMENT CONFIRMED" : "❌ PAYMENT FAILED";
@@ -529,19 +560,41 @@ function kwetupizza_notify_admin($order_id, $success = true) {
     $message .= "💳 *Payment:* $status\n";
     $message .= "⏱️ *Time:* " . date('Y-m-d H:i:s');
     
+    // Log message content for debugging
+    kwetupizza_log("Prepared admin WhatsApp notification message: " . substr($message, 0, 100) . "...", 'info', 'admin-notification.log');
+    
+    $whatsapp_sent = false;
     if (!empty($admin_phone)) {
-        kwetupizza_send_whatsapp_message($admin_phone, $message);
+        kwetupizza_log("Attempting to send WhatsApp notification to admin at $admin_phone", 'info', 'admin-notification.log');
+        $whatsapp_sent = kwetupizza_send_whatsapp_message($admin_phone, $message);
+        if ($whatsapp_sent) {
+            kwetupizza_log("Successfully sent WhatsApp notification to admin", 'info', 'admin-notification.log');
+        } else {
+            kwetupizza_log("Failed to send WhatsApp notification to admin", 'error', 'admin-notification.log');
+        }
+    } else {
+        kwetupizza_log("No admin WhatsApp number configured, skipping WhatsApp notification", 'warning', 'admin-notification.log');
     }
     
     $admin_sms = get_option('kwetupizza_admin_sms');
+    $sms_sent = false;
     if (!empty($admin_sms)) {
         // Simplified message for SMS due to length constraints
         $sms_message = "Order #$order_id: {$order->customer_name}, {$order->customer_phone}, " . 
                        kwetupizza_format_currency($order->total, $order->currency) . ". Payment: $status";
-        kwetupizza_send_nextsms($admin_sms, $sms_message);
+        kwetupizza_log("Attempting to send SMS notification to admin at $admin_sms", 'info', 'admin-notification.log');
+        $sms_sent = kwetupizza_send_nextsms($admin_sms, $sms_message);
+        if ($sms_sent) {
+            kwetupizza_log("Successfully sent SMS notification to admin", 'info', 'admin-notification.log');
+        } else {
+            kwetupizza_log("Failed to send SMS notification to admin", 'error', 'admin-notification.log');
+        }
+    } else {
+        kwetupizza_log("No admin SMS number configured, skipping SMS notification", 'warning', 'admin-notification.log');
     }
     
-    return true;
+    kwetupizza_log("Admin notification process completed for order #$order_id", 'info', 'admin-notification.log');
+    return ($whatsapp_sent || $sms_sent); // Return true if at least one notification was sent
 }
 
 /**
