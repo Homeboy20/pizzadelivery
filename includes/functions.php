@@ -1435,16 +1435,37 @@ if (!function_exists('kwetupizza_generate_mobile_money_push')) {
     function kwetupizza_generate_mobile_money_push($from, $cart, $address, $payment_phone) {
         global $wpdb;
 
-        // Calculate the total
-        $total = 0;
-        foreach ($cart as $item) {
-            $total += $item['total'];
+        // Log the function entry
+        kwetupizza_log("Initiating mobile money payment for user: $from", 'info', 'payment.log');
+        
+        $context = kwetupizza_get_conversation_context($from);
+        
+        // Use the grand_total if available, otherwise calculate from cart
+        if (isset($context['grand_total'])) {
+            $total = $context['grand_total'];
+            kwetupizza_log("Using grand total from context: $total TZS", 'info', 'payment.log');
+        } else {
+            // Calculate the total from cart items
+            $total = 0;
+            foreach ($cart as $item) {
+                $total += $item['total'];
+            }
+            kwetupizza_log("Calculated total from cart: $total TZS", 'info', 'payment.log');
         }
 
         $tx_ref = 'order_' . time();  // Unique transaction reference
         $email = kwetupizza_get_customer_email($from);
-        $context = kwetupizza_get_conversation_context($from);
         $network = $context['payment_provider'];
+        
+        kwetupizza_log("Payment details - Network: $network, Phone: $payment_phone, Amount: $total TZS", 'info', 'payment.log');
+
+        // Save order in database first
+        $order_id = kwetupizza_save_order_to_db($from, $cart, $address, $total, $context);
+        if ($order_id) {
+            // Use order ID in the transaction reference
+            $tx_ref = 'order-' . $order_id;
+            kwetupizza_log("Created order #$order_id with tx_ref: $tx_ref", 'info', 'payment.log');
+        }
 
         $body = array(
             "tx_ref" => $tx_ref,
@@ -1456,23 +1477,124 @@ if (!function_exists('kwetupizza_generate_mobile_money_push')) {
             "fullname" => "KwetuPizza Customer",
             "meta" => array("delivery_address" => $address),
         );
+        
+        // Log the request payload
+        kwetupizza_log("Flutterwave request: " . json_encode($body), 'info', 'payment.log');
+        
+        // Get API key
+        $flw_secret_key = get_option('kwetupizza_flw_secret_key');
+        if (empty($flw_secret_key)) {
+            kwetupizza_log("ERROR: Missing Flutterwave secret key", 'error', 'payment.log');
+            kwetupizza_send_whatsapp_message($from, "Error: Payment gateway not properly configured. Please contact support.");
+            return false;
+        }
 
         $response = wp_remote_post('https://api.flutterwave.com/v3/charges?type=mobile_money_tanzania', [
             'headers' => [
-                'Authorization' => 'Bearer ' . get_option('kwetupizza_flw_secret_key'),
+                'Authorization' => 'Bearer ' . $flw_secret_key,
                 'Content-Type' => 'application/json'
             ],
             'body' => json_encode($body)
         ]);
 
+        // Check for request errors
+        if (is_wp_error($response)) {
+            $error_message = $response->get_error_message();
+            kwetupizza_log("ERROR: Flutterwave API request failed: $error_message", 'error', 'payment.log');
+            kwetupizza_send_whatsapp_message($from, "Error initiating the payment. Please try again later or contact support.");
+            return false;
+        }
+
         $response_body = wp_remote_retrieve_body($response);
         $result = json_decode($response_body, true);
+        
+        // Log the response
+        kwetupizza_log("Flutterwave response: " . $response_body, 'info', 'payment.log');
 
         if (isset($result['status']) && $result['status'] == 'success') {
-            kwetupizza_send_whatsapp_message($from, "Payment request has been sent to $payment_phone. Please confirm the payment.");
+            kwetupizza_log("Payment request successfully sent to $payment_phone", 'info', 'payment.log');
+            kwetupizza_send_whatsapp_message($from, "Payment request has been sent to $payment_phone. Please check your phone and confirm the payment.");
+            return true;
         } else {
-            kwetupizza_send_whatsapp_message($from, "Error initiating the payment. Please try again.");
+            $error = isset($result['message']) ? $result['message'] : 'Unknown error';
+            kwetupizza_log("ERROR: Payment initiation failed: $error", 'error', 'payment.log');
+            kwetupizza_send_whatsapp_message($from, "Error initiating the payment: $error. Please try again or contact support.");
+            return false;
         }
+    }
+}
+
+/**
+ * Save order to database
+ */
+if (!function_exists('kwetupizza_save_order_to_db')) {
+    function kwetupizza_save_order_to_db($phone, $cart, $address, $total, $context) {
+        global $wpdb;
+        $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+        $order_items_table = $wpdb->prefix . 'kwetupizza_order_items';
+        $transactions_table = $wpdb->prefix . 'kwetupizza_transactions';
+        
+        // Try to get the customer name from context or use phone as default
+        $customer_name = isset($context['customer_name']) ? $context['customer_name'] : "Customer-" . substr($phone, -5);
+        
+        // Insert order
+        $wpdb->insert(
+            $orders_table,
+            [
+                'customer_name' => $customer_name,
+                'customer_phone' => $phone,
+                'customer_email' => kwetupizza_get_customer_email($phone),
+                'delivery_address' => $address,
+                'delivery_phone' => $phone,
+                'status' => 'pending_payment',
+                'total' => $total,
+                'currency' => 'TZS',
+                'created_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql')
+            ]
+        );
+        
+        $order_id = $wpdb->insert_id;
+        
+        if (!$order_id) {
+            kwetupizza_log("Failed to create order: " . $wpdb->last_error, 'error', 'payment.log');
+            return false;
+        }
+        
+        // Insert order items
+        foreach ($cart as $item) {
+            $wpdb->insert(
+                $order_items_table,
+                [
+                    'order_id' => $order_id,
+                    'product_id' => $item['product_id'],
+                    'quantity' => $item['quantity'],
+                    'price' => $item['price'],
+                    'created_at' => current_time('mysql')
+                ]
+            );
+        }
+        
+        // Create transaction record
+        $wpdb->insert(
+            $transactions_table,
+            [
+                'order_id' => $order_id,
+                'transaction_date' => current_time('mysql'),
+                'payment_method' => isset($context['payment_provider']) ? $context['payment_provider'] : 'Mobile Money',
+                'payment_status' => 'pending',
+                'amount' => $total,
+                'currency' => 'TZS',
+                'payment_provider' => 'Flutterwave',
+                'created_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql')
+            ]
+        );
+        
+        // Add order to timeline
+        kwetupizza_add_order_timeline_event($order_id, 'order_placed', 'Order placed, awaiting payment');
+        
+        return $order_id;
     }
 }
 
