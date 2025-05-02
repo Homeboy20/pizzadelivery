@@ -334,6 +334,13 @@ function kwetupizza_render_settings_page() {
         <?php endif; ?>
     </div>
     
+    <!-- Test Notifications Button -->
+    <div class="kwetu-admin-box">
+        <h3>Test Notifications</h3>
+        <p>Use this utility to test SMS and WhatsApp notifications for payment confirmations and failures.</p>
+        <a href="<?php echo plugins_url('includes/test-notifications.php', dirname(__FILE__)); ?>" class="button button-primary" target="_blank">Open Test Notifications Page</a>
+    </div>
+    
     <script>
     jQuery(document).ready(function($) {
         // Tab switching functionality

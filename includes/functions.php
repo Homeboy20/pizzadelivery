@@ -393,12 +393,15 @@ function kwetupizza_send_whatsapp_message($phone, $message) {
  * Send SMS via NextSMS
  */
 function kwetupizza_send_nextsms($phone, $message) {
+    // Log the attempt to send an SMS
+    kwetupizza_log("Attempting to send SMS to $phone", 'info', 'sms.log');
+    
     $username = get_option('kwetupizza_nextsms_username');
     $password = get_option('kwetupizza_nextsms_password');
     $sender_id = get_option('kwetupizza_nextsms_sender_id', 'KwetuPizza');
     
     if (empty($username) || empty($password)) {
-        error_log('NextSMS credentials not set');
+        kwetupizza_log('NextSMS credentials not set', 'error', 'sms.log');
         return false;
     }
     
@@ -412,12 +415,13 @@ function kwetupizza_send_nextsms($phone, $message) {
     
     // Verify required data is present
     if (empty($phone) || empty($message)) {
-        error_log('NextSMS Error: Missing required parameters (phone or message)');
+        kwetupizza_log('NextSMS Error: Missing required parameters (phone or message)', 'error', 'sms.log');
         return false;
     }
     
     // NextSMS API endpoint
     $url = 'https://messaging-service.co.tz/api/sms/v1/text/single';
+    kwetupizza_log("Using NextSMS API endpoint: $url", 'info', 'sms.log');
     
     // Setup the request payload with all required fields
     $payload = array(
@@ -427,7 +431,10 @@ function kwetupizza_send_nextsms($phone, $message) {
     );
     
     // Log the payload for debugging
-    error_log('NextSMS Payload: ' . print_r($payload, true));
+    kwetupizza_log('NextSMS Payload: ' . print_r($payload, true), 'info', 'sms.log');
+    
+    // Log authentication info (without exposing the password)
+    kwetupizza_log("Using NextSMS username: $username with sender ID: $sender_id", 'info', 'sms.log');
     
     // Send the request
     $response = wp_remote_post($url, array(
@@ -442,18 +449,18 @@ function kwetupizza_send_nextsms($phone, $message) {
     
     // Check for errors
     if (is_wp_error($response)) {
-        error_log('NextSMS Error: ' . $response->get_error_message());
+        kwetupizza_log('NextSMS Error: ' . $response->get_error_message(), 'error', 'sms.log');
         return false;
     }
     
     $body = json_decode(wp_remote_retrieve_body($response), true);
     
     // Log the response for debugging
-    error_log('NextSMS Response: ' . print_r($body, true));
+    kwetupizza_log('NextSMS Response: ' . print_r($body, true), 'info', 'sms.log');
     
     // Check for successful response
     if (isset($body['success']) && $body['success']) {
-        kwetupizza_log("SMS sent to $phone successfully", 'info');
+        kwetupizza_log("SMS sent to $phone successfully", 'info', 'sms.log');
         return true;
     } else {
         $error_message = isset($body['message']) ? $body['message'] : 'Unknown error';
@@ -466,7 +473,7 @@ function kwetupizza_send_nextsms($phone, $message) {
             }
         }
         
-        kwetupizza_log("Failed to send SMS to $phone: $error_message", 'error');
+        kwetupizza_log("Failed to send SMS to $phone: $error_message", 'error', 'sms.log');
         return false;
     }
 }
@@ -799,32 +806,46 @@ if (!function_exists('kwetupizza_get_customer_email')) {
  */
 if (!function_exists('kwetupizza_flutterwave_webhook')) {
     function kwetupizza_flutterwave_webhook(WP_REST_Request $request) {
+        // Log that webhook was triggered
+        kwetupizza_log('Flutterwave webhook triggered', 'info', 'payment-webhook.log');
+        
         // Verify webhook signature
         if (!kwetupizza_verify_flutterwave_signature($request)) {
-            kwetupizza_log('Invalid webhook signature', 'error', 'flutterwave-webhook.log');
+            kwetupizza_log('Invalid webhook signature', 'error', 'payment-webhook.log');
             return new WP_REST_Response('Invalid signature', 401);
         }
         
         $webhook_data = json_decode($request->get_body(), true);
-        kwetupizza_log('Webhook received: ' . print_r($webhook_data, true), 'info', 'flutterwave-webhook.log');
+        kwetupizza_log('Webhook received: ' . print_r($webhook_data, true), 'info', 'payment-webhook.log');
         
         if (isset($webhook_data['event']) && $webhook_data['event'] === 'charge.completed') {
             $status = $webhook_data['data']['status'];
             $transaction_id = $webhook_data['data']['id'];
             $tx_ref = $webhook_data['data']['tx_ref'];
             
+            kwetupizza_log("Processing payment with status: $status, tx_ref: $tx_ref", 'info', 'payment-webhook.log');
+            
             if ($status === 'successful') {
+                // Verify payment with Flutterwave API
+                kwetupizza_log("Verifying payment with transaction ID: $transaction_id", 'info', 'payment-webhook.log');
                 $verification_data = kwetupizza_verify_payment($transaction_id);
+                
                 if ($verification_data) {
-                    kwetupizza_process_successful_payment($verification_data);
+                    kwetupizza_log("Payment verification successful, processing payment", 'info', 'payment-webhook.log');
+                    $result = kwetupizza_process_successful_payment($verification_data);
+                    
+                    if ($result) {
+                        kwetupizza_log("Payment processed successfully for tx_ref: $tx_ref", 'info', 'payment-webhook.log');
+                    } else {
+                        kwetupizza_log("Failed to process payment for tx_ref: $tx_ref", 'error', 'payment-webhook.log');
+                    }
+                    
                     return new WP_REST_Response('Payment processed successfully', 200);
                 } else {
-                    kwetupizza_log('Payment verification failed for transaction ID: ' . $transaction_id, 'error', 'flutterwave-webhook.log');
+                    kwetupizza_log('Payment verification failed for transaction ID: ' . $transaction_id, 'error', 'payment-webhook.log');
                     return new WP_REST_Response('Payment verification failed', 400);
                 }
             } elseif ($status === 'failed') {
-                $tx_ref = $webhook_data['data']['tx_ref'];
-                
                 // Extract failure reason if available
                 $failure_reason = '';
                 if (isset($webhook_data['data']['processor_response'])) {
@@ -833,9 +854,19 @@ if (!function_exists('kwetupizza_flutterwave_webhook')) {
                     $failure_reason = $webhook_data['data']['gateway_response'];
                 }
                 
-                kwetupizza_handle_failed_payment($tx_ref, $failure_reason);
+                kwetupizza_log("Processing failed payment for tx_ref: $tx_ref, reason: $failure_reason", 'info', 'payment-webhook.log');
+                $result = kwetupizza_handle_failed_payment($tx_ref, $failure_reason);
+                
+                if ($result) {
+                    kwetupizza_log("Failed payment handled successfully for tx_ref: $tx_ref", 'info', 'payment-webhook.log');
+                } else {
+                    kwetupizza_log("Error handling failed payment for tx_ref: $tx_ref", 'error', 'payment-webhook.log');
+                }
+                
                 return new WP_REST_Response('Payment failed', 400);
             }
+        } else {
+            kwetupizza_log("Unsupported webhook event: " . (isset($webhook_data['event']) ? $webhook_data['event'] : 'unknown'), 'info', 'payment-webhook.log');
         }
         
         return new WP_REST_Response('Event not supported', 400);
@@ -1989,11 +2020,17 @@ if (!function_exists('kwetupizza_notify_customer')) {
         global $wpdb;
         $orders_table = $wpdb->prefix . 'kwetupizza_orders';
         
+        // Log that this function is being called
+        kwetupizza_log("Starting notification for order #$order_id with status: $status", 'info', 'notifications.log');
+        
         $order = $wpdb->get_row($wpdb->prepare("SELECT * FROM $orders_table WHERE id = %d", $order_id));
         
         if (!$order) {
+            kwetupizza_log("Failed to find order #$order_id for notification", 'error', 'notifications.log');
             return false;
         }
+        
+        kwetupizza_log("Found order #$order_id for: {$order->customer_name}, phone: {$order->customer_phone}", 'info', 'notifications.log');
         
         $status_messages = array(
             'processing' => "Your order #$order_id is now being processed. We'll update you when it's ready for delivery.",
@@ -2011,11 +2048,25 @@ if (!function_exists('kwetupizza_notify_customer')) {
             $message .= "\n\n" . $additional_message;
         }
         
+        kwetupizza_log("Preparing to send notification message: " . substr($message, 0, 100) . "...", 'info', 'notifications.log');
+        
         // Send WhatsApp notification
         $whatsapp_sent = kwetupizza_send_whatsapp_message($order->customer_phone, $message);
         
+        if ($whatsapp_sent) {
+            kwetupizza_log("WhatsApp message sent successfully to {$order->customer_phone}", 'info', 'notifications.log');
+        } else {
+            kwetupizza_log("Failed to send WhatsApp message to {$order->customer_phone}", 'error', 'notifications.log');
+        }
+        
         // Send SMS notification
         $sms_sent = kwetupizza_send_nextsms($order->customer_phone, $message);
+        
+        if ($sms_sent) {
+            kwetupizza_log("SMS sent successfully to {$order->customer_phone}", 'info', 'notifications.log');
+        } else {
+            kwetupizza_log("Failed to send SMS to {$order->customer_phone}", 'error', 'notifications.log');
+        }
         
         return ($whatsapp_sent || $sms_sent);
     }
