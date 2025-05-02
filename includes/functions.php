@@ -1,7 +1,7 @@
 <?php
 // Prevent direct access and ensure WordPress is loaded
 if (!defined('ABSPATH')) {
-    require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/wp-load.php');
+    die('Access denied.');
 }
 
 /**
@@ -24,7 +24,7 @@ function kwetupizza_create_tables() {
     $charset_collate = $wpdb->get_charset_collate();
 
         // Include WordPress upgrade functions
-        require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/wp-admin/includes/upgrade.php');
+        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
 
     // Users Table
     $users_table = $wpdb->prefix . 'kwetupizza_users';
