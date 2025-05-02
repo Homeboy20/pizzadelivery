@@ -1254,26 +1254,30 @@ if (!function_exists('kwetupizza_handle_add_or_checkout')) {
         if ($response === 'add') {
             kwetupizza_send_menu_categories($from);
             $context['awaiting'] = 'menu_selection';
+            kwetupizza_set_conversation_context($from, $context);
         } elseif ($response === 'checkout') {
+            // Calculate the order total
             $total = 0;
-            $summary_message = "Here is your order summary:\n";
+            $summary_message = "📋 *Order Summary* 📋\n\n";
             foreach ($context['cart'] as $cart_item) {
-                $summary_message .= $cart_item['quantity'] . " x " . $cart_item['product_name'] . " - " . number_format($cart_item['total'], 2) . " TZS\n";
+                $summary_message .= "{$cart_item['quantity']} x {$cart_item['product_name']} - " . number_format($cart_item['total'], 2) . " TZS\n";
                 $total += $cart_item['total'];
             }
-            $summary_message .= "\nTotal: " . number_format($total, 2) . " TZS\n";
-            $summary_message .= "Please provide your delivery address.";
-
-            kwetupizza_send_whatsapp_message($from, $summary_message);
+            $summary_message .= "\nSubtotal: " . number_format($total, 2) . " TZS\n";
+            $summary_message .= "Next, you'll select your delivery area to calculate the final price.\n";
+            
+            // Save the total in the context
             $context['total'] = $total;
-            $context['awaiting'] = 'address';
+            kwetupizza_set_conversation_context($from, $context);
+            
+            // Send the order summary
+            kwetupizza_send_whatsapp_message($from, $summary_message);
+            
+            // Show delivery zones immediately after checkout
+            kwetupizza_show_delivery_zones($from);
         } else {
             kwetupizza_send_whatsapp_message($from, "Sorry, I didn't understand that. Type 'add' to add more items or 'checkout' to proceed.");
-            return;
         }
-
-        // Update the conversation context
-        kwetupizza_set_conversation_context($from, $context);
     }
 }
 
