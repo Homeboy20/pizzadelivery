@@ -17,6 +17,7 @@ function kwetupizza_render_order_management() {
     
     // Custom styles
     echo '<style>
+        /* Order Card Styles */
         .order-card {
             transition: all 0.3s ease;
             border-left: 4px solid #ccc;
@@ -24,27 +25,87 @@ function kwetupizza_render_order_management() {
         .order-card:hover {
             box-shadow: 0 5px 15px rgba(0,0,0,0.1);
         }
-        .order-card.pending { border-left-color: #ffc107; }
-        .order-card.processing { border-left-color: #17a2b8; }
-        .order-card.payment_confirmed { border-left-color: #6f42c1; }
-        .order-card.dispatched { border-left-color: #fd7e14; }
-        .order-card.delivered { border-left-color: #20c997; }
-        .order-card.completed { border-left-color: #28a745; }
-        .order-card.cancelled { border-left-color: #dc3545; }
         
-        .badge.pending { background-color: #ffc107; color: #000; }
-        .badge.processing { background-color: #17a2b8; }
-        .badge.payment_confirmed { background-color: #6f42c1; }
-        .badge.dispatched { background-color: #fd7e14; }
-        .badge.delivered { background-color: #20c997; }
-        .badge.completed { background-color: #28a745; }
-        .badge.cancelled { background-color: #dc3545; }
+        /* Status Colors */
+        .order-card.pending, .badge.pending { border-left-color: #ffc107; background-color: #ffc107; color: #000; }
+        .order-card.processing, .badge.processing { border-left-color: #17a2b8; background-color: #17a2b8; color: #fff; }
+        .order-card.payment_confirmed, .badge.payment_confirmed { border-left-color: #6f42c1; background-color: #6f42c1; color: #fff; }
+        .order-card.dispatched, .badge.dispatched { border-left-color: #fd7e14; background-color: #fd7e14; color: #fff; }
+        .order-card.delivered, .badge.delivered { border-left-color: #20c997; background-color: #20c997; color: #fff; }
+        .order-card.completed, .badge.completed { border-left-color: #28a745; background-color: #28a745; color: #fff; }
+        .order-card.cancelled, .badge.cancelled { border-left-color: #dc3545; background-color: #dc3545; color: #fff; }
         
+        /* Table Optimizations */
+        .table-responsive {
+            overflow-x: visible;
+        }
+        
+        .table th, .table td {
+            padding: 0.5rem;
+            vertical-align: middle;
+        }
+        
+        /* Compact Text */
+        .compact-text {
+            font-size: 0.875rem;
+            line-height: 1.3;
+        }
+        
+        .customer-info {
+            max-width: 180px;
+        }
+        
+        /* Action Dropdown */
+        .action-dropdown .dropdown-menu {
+            min-width: 200px;
+        }
+        
+        /* Badge Styling */
+        .badge {
+            font-size: 0.75rem;
+            padding: 0.35em 0.65em;
+            font-weight: 500;
+        }
+        
+        /* Modal Z-Index */
         .modal-backdrop {
             z-index: 1040;
         }
         .modal {
             z-index: 1050;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .order-table th:nth-child(2), .order-table td:nth-child(2) {
+                display: none;
+            }
+        }
+        
+        @media (max-width: 767px) {
+            .col-md-9, .col-md-3 {
+                width: 100%;
+            }
+            
+            .card-stats {
+                margin-top: 1rem;
+            }
+        }
+        
+        /* Button sizing for quick actions */
+        .action-buttons .btn {
+            width: 30px;
+            height: 30px;
+            padding: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .action-buttons .dashicons {
+            width: 18px;
+            height: 18px;
+            font-size: 18px;
         }
     </style>';
 
@@ -59,7 +120,7 @@ function kwetupizza_render_order_management() {
             </div>
             
             <div class="row mb-4">
-                <div class="col-md-8">
+                <div class="col-md-9">
                     <div class="card shadow-sm">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Recent Orders</h5>
@@ -71,54 +132,83 @@ function kwetupizza_render_order_management() {
                         </div>
                         <div class="card-body p-0">
                             <div class="table-responsive">
-                                <table class="table table-hover mb-0">
+                                <table class="table table-hover mb-0 order-table">
                                     <thead class="table-light">
                                         <tr>
-                                            <th>ID</th>
-                                            <th>Date</th>
-                                            <th>Customer</th>
-                                            <th>Amount</th>
-                                            <th>Status</th>
-                                            <th>Actions</th>
+                                            <th width="8%">ID</th>
+                                            <th width="15%">Date</th>
+                                            <th width="27%">Customer</th>
+                                            <th width="15%">Amount</th>
+                                            <th width="15%">Status</th>
+                                            <th width="20%">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         <?php if (!empty($orders)): ?>
                                             <?php foreach ($orders as $order): ?>
                                                 <tr>
-                                                    <td>#<?php echo esc_html($order->id); ?></td>
-                                                    <td><?php echo esc_html(date('M d, H:i', strtotime($order->order_date))); ?></td>
-                                                    <td>
-                                                        <div><?php echo esc_html($order->customer_name); ?></div>
+                                                    <td class="compact-text">#<?php echo esc_html($order->id); ?></td>
+                                                    <td class="compact-text"><?php echo esc_html(date('M d, H:i', strtotime($order->order_date))); ?></td>
+                                                    <td class="customer-info compact-text">
+                                                        <div><strong><?php echo esc_html($order->customer_name); ?></strong></div>
                                                         <small class="text-muted"><?php echo esc_html($order->customer_phone); ?></small>
                                                     </td>
-                                                    <td><?php echo esc_html(number_format($order->total, 2)); ?> Tzs</td>
+                                                    <td class="compact-text"><?php echo esc_html(number_format($order->total, 2)); ?> Tzs</td>
                                                     <td>
                                                         <span class="badge <?php echo esc_attr($order->status); ?>">
                                                             <?php echo esc_html(ucfirst(str_replace('_', ' ', $order->status))); ?>
                                                         </span>
                                                     </td>
                                                     <td>
-                                                        <div class="btn-group btn-group-sm">
-                                                            <button class="btn btn-outline-primary view-order" data-id="<?php echo esc_attr($order->id); ?>">
-                                                                <i class="dashicons dashicons-visibility"></i>
+                                                        <div class="dropdown action-dropdown">
+                                                            <button class="btn btn-sm btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                                                <i class="dashicons dashicons-admin-tools"></i> Actions
                                                             </button>
-                                                            <button class="btn btn-outline-secondary edit-order" data-id="<?php echo esc_attr($order->id); ?>">
-                                                                <i class="dashicons dashicons-edit"></i>
-                                                            </button>
-                                                            <?php if ($order->status == 'processing' || $order->status == 'payment_confirmed'): ?>
-                                                                <button class="btn btn-outline-warning dispatch-order" data-id="<?php echo esc_attr($order->id); ?>">
-                                                                    <i class="dashicons dashicons-airplane"></i>
-                                                                </button>
-                                                            <?php endif; ?>
-                                                            <?php if ($order->status == 'dispatched'): ?>
-                                                                <button class="btn btn-outline-success mark-delivered" data-id="<?php echo esc_attr($order->id); ?>">
-                                                                    <i class="dashicons dashicons-yes-alt"></i>
-                                                                </button>
-                                                            <?php endif; ?>
-                                                            <button class="btn btn-outline-danger delete-order" data-id="<?php echo esc_attr($order->id); ?>">
-                                                                <i class="dashicons dashicons-trash"></i>
-                                                            </button>
+                                                            <ul class="dropdown-menu dropdown-menu-end">
+                                                                <!-- Quick access buttons -->
+                                                                <li class="px-2 py-1 d-flex justify-content-between action-buttons">
+                                                                    <button class="btn btn-sm btn-outline-primary me-1 view-order" data-id="<?php echo esc_attr($order->id); ?>" title="View Details">
+                                                                        <i class="dashicons dashicons-visibility"></i>
+                                                                    </button>
+                                                                    <button class="btn btn-sm btn-outline-secondary me-1 edit-order" data-id="<?php echo esc_attr($order->id); ?>" title="Edit Order">
+                                                                        <i class="dashicons dashicons-edit"></i>
+                                                                    </button>
+                                                                    <button class="btn btn-sm btn-outline-warning me-1 dispatch-order" data-id="<?php echo esc_attr($order->id); ?>" <?php echo ($order->status != 'pending' && $order->status != 'processing' && $order->status != 'payment_confirmed') ? 'disabled' : ''; ?> title="Dispatch Order">
+                                                                        <i class="dashicons dashicons-airplane"></i>
+                                                                    </button>
+                                                                    <button class="btn btn-sm btn-outline-success me-1 mark-delivered" data-id="<?php echo esc_attr($order->id); ?>" <?php echo ($order->status != 'dispatched') ? 'disabled' : ''; ?> title="Mark Delivered">
+                                                                        <i class="dashicons dashicons-yes-alt"></i>
+                                                                    </button>
+                                                                </li>
+                                                                <li><hr class="dropdown-divider"></li>
+                                                                <!-- Detailed menu items -->
+                                                                <li>
+                                                                    <button class="dropdown-item view-order" data-id="<?php echo esc_attr($order->id); ?>">
+                                                                        <i class="dashicons dashicons-visibility"></i> View Details
+                                                                    </button>
+                                                                </li>
+                                                                <li>
+                                                                    <button class="dropdown-item edit-order" data-id="<?php echo esc_attr($order->id); ?>">
+                                                                        <i class="dashicons dashicons-edit"></i> Edit Order
+                                                                    </button>
+                                                                </li>
+                                                                <li>
+                                                                    <button class="dropdown-item dispatch-order" data-id="<?php echo esc_attr($order->id); ?>" <?php echo ($order->status != 'pending' && $order->status != 'processing' && $order->status != 'payment_confirmed') ? 'disabled' : ''; ?>>
+                                                                        <i class="dashicons dashicons-airplane"></i> Dispatch
+                                                                    </button>
+                                                                </li>
+                                                                <li>
+                                                                    <button class="dropdown-item mark-delivered" data-id="<?php echo esc_attr($order->id); ?>" <?php echo ($order->status != 'dispatched') ? 'disabled' : ''; ?>>
+                                                                        <i class="dashicons dashicons-yes-alt"></i> Mark Delivered
+                                                                    </button>
+                                                                </li>
+                                                                <li><hr class="dropdown-divider"></li>
+                                                                <li>
+                                                                    <button class="dropdown-item text-danger delete-order" data-id="<?php echo esc_attr($order->id); ?>">
+                                                                        <i class="dashicons dashicons-trash"></i> Delete
+                                                                    </button>
+                                                                </li>
+                                                            </ul>
                                                         </div>
                                                     </td>
                                                 </tr>
@@ -140,8 +230,8 @@ function kwetupizza_render_order_management() {
                     </div>
                 </div>
                 
-                <div class="col-md-4">
-                    <div class="card shadow-sm mb-4">
+                <div class="col-md-3">
+                    <div class="card shadow-sm mb-4 card-stats">
                         <div class="card-header bg-white">
                             <h5 class="mb-0">Order Statistics</h5>
                         </div>
@@ -216,30 +306,84 @@ function kwetupizza_render_order_management() {
                         <div class="container-fluid">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <h6>Customer Information</h6>
-                                    <p id="view_customer_info"></p>
+                                    <div class="card mb-3">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">Customer Information</h6>
+                                        </div>
+                                        <div class="card-body" id="view_customer_info">
+                                            <!-- Customer info will be populated here -->
+                                        </div>
+                                    </div>
                                 </div>
                                 <div class="col-md-6">
-                                    <h6>Order Information</h6>
-                                    <p id="view_order_info"></p>
+                                    <div class="card mb-3">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">Order Information</h6>
+                                        </div>
+                                        <div class="card-body" id="view_order_info">
+                                            <!-- Order info will be populated here -->
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="row mt-3">
+                            <div class="row">
                                 <div class="col-12">
-                                    <h6>Delivery Address</h6>
-                                    <p id="view_delivery_address"></p>
+                                    <div class="card mb-3">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">Delivery Address</h6>
+                                        </div>
+                                        <div class="card-body" id="view_delivery_address">
+                                            <!-- Delivery address will be populated here -->
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
-                            <div class="row mt-3">
+                            <div class="row">
                                 <div class="col-12">
-                                    <h6>Order Items</h6>
-                                    <div id="view_order_items"></div>
+                                    <div class="card">
+                                        <div class="card-header bg-light">
+                                            <h6 class="mb-0">Order Items</h6>
+                                        </div>
+                                        <div class="card-body p-0">
+                                            <div class="table-responsive">
+                                                <table class="table table-sm mb-0" id="view_order_items_table">
+                                                    <thead class="table-light">
+                                                        <tr>
+                                                            <th>Item</th>
+                                                            <th>Price</th>
+                                                            <th>Qty</th>
+                                                            <th class="text-end">Total</th>
+                                                        </tr>
+                                                    </thead>
+                                                    <tbody id="view_order_items_body">
+                                                        <!-- Order items will be populated here -->
+                                                    </tbody>
+                                                    <tfoot class="table-light" id="view_order_items_footer">
+                                                        <!-- Total will be populated here -->
+                                                    </tfoot>
+                                                </table>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        <div class="d-flex justify-content-between w-100">
+                            <div>
+                                <button type="button" class="btn btn-outline-primary" id="view_edit_btn">
+                                    <i class="dashicons dashicons-edit"></i> Edit
+                                </button>
+                                <button type="button" class="btn btn-outline-warning" id="view_dispatch_btn">
+                                    <i class="dashicons dashicons-airplane"></i> Dispatch
+                                </button>
+                                <button type="button" class="btn btn-outline-success" id="view_deliver_btn">
+                                    <i class="dashicons dashicons-yes-alt"></i> Mark Delivered
+                                </button>
+                            </div>
+                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -256,6 +400,7 @@ function kwetupizza_render_order_management() {
                     <div class="modal-body">
                         <form id="edit-order-form">
                             <input type="hidden" name="order_id" id="order_id">
+                            <input type="hidden" name="_ajax_nonce" value="<?php echo wp_create_nonce('kwetupizza_order_nonce'); ?>">
                             <div class="mb-3">
                                 <label for="edit_customer_name" class="form-label">Customer Name</label>
                                 <input type="text" class="form-control" name="customer_name" id="edit_customer_name">
@@ -327,6 +472,15 @@ function kwetupizza_render_order_management() {
 
     <script>
         jQuery(document).ready(function($) {
+            // Initialize Bootstrap tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[title]'));
+            tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl, {
+                    placement: 'top',
+                    delay: { show: 500, hide: 100 }
+                });
+            });
+            
             // Update delivery time display
             $('#estimated_delivery_time').on('input', function() {
                 $('#delivery_time_display').text($(this).val() + ' minutes');
@@ -340,34 +494,127 @@ function kwetupizza_render_order_management() {
                     url: ajaxurl,
                     method: 'POST',
                     data: {
-                        action: 'kwetupizza_get_order',
+                        action: 'kwetupizza_get_order_details',
                         order_id: orderId,
                         _ajax_nonce: '<?php echo wp_create_nonce("kwetupizza_order_nonce"); ?>'
                     },
                     success: function(response) {
                         if (response.success) {
-                            var order = response.data;
+                            var order = response.data.order;
+                            var items = response.data.items;
+                            
                             // Set customer info
                             $('#view_customer_info').html(`
-                                <strong>Name:</strong> ${order.customer_name}<br>
-                                <strong>Phone:</strong> ${order.customer_phone}
+                                <p class="mb-1"><strong>Name:</strong> ${order.customer_name}</p>
+                                <p class="mb-1"><strong>Phone:</strong> ${order.customer_phone}</p>
                             `);
                             
                             // Set order info
                             $('#view_order_info').html(`
-                                <strong>Order ID:</strong> #${order.id}<br>
-                                <strong>Date:</strong> ${order.order_date}<br>
-                                <strong>Status:</strong> <span class="badge ${order.status}">${order.status}</span><br>
-                                <strong>Total:</strong> ${order.total} Tzs
+                                <p class="mb-1"><strong>Order ID:</strong> #${order.id}</p>
+                                <p class="mb-1"><strong>Date:</strong> ${order.order_date}</p>
+                                <p class="mb-1"><strong>Status:</strong> <span class="badge ${order.status}">${order.status.replace('_', ' ')}</span></p>
+                                <p class="mb-0"><strong>Total:</strong> ${parseFloat(order.total).toFixed(2)} Tzs</p>
                             `);
                             
                             // Set delivery address
-                            $('#view_delivery_address').text(order.delivery_address);
+                            $('#view_delivery_address').html(`
+                                <p class="mb-0">${order.delivery_address}</p>
+                            `);
+                            
+                            // Set order items
+                            var itemsHtml = '';
+                            var subtotal = 0;
+                            
+                            if (items && items.length > 0) {
+                                items.forEach(function(item) {
+                                    var itemTotal = parseFloat(item.price) * parseInt(item.quantity);
+                                    subtotal += itemTotal;
+                                    
+                                    itemsHtml += `
+                                        <tr>
+                                            <td>${item.product_name}</td>
+                                            <td>${parseFloat(item.price).toFixed(2)} Tzs</td>
+                                            <td>${item.quantity}</td>
+                                            <td class="text-end">${itemTotal.toFixed(2)} Tzs</td>
+                                        </tr>
+                                    `;
+                                });
+                                
+                                $('#view_order_items_body').html(itemsHtml);
+                                $('#view_order_items_footer').html(`
+                                    <tr>
+                                        <th colspan="3" class="text-end">Subtotal:</th>
+                                        <th class="text-end">${subtotal.toFixed(2)} Tzs</th>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="3" class="text-end">Delivery Fee:</th>
+                                        <th class="text-end">${(parseFloat(order.total) - subtotal).toFixed(2)} Tzs</th>
+                                    </tr>
+                                    <tr>
+                                        <th colspan="3" class="text-end">Total:</th>
+                                        <th class="text-end">${parseFloat(order.total).toFixed(2)} Tzs</th>
+                                    </tr>
+                                `);
+                            } else {
+                                $('#view_order_items_body').html('<tr><td colspan="4" class="text-center">No items found</td></tr>');
+                                $('#view_order_items_footer').html('');
+                            }
+                            
+                            // Configure action buttons based on order status
+                            var status = order.status;
+                            
+                            // Edit button is always enabled
+                            $('#view_edit_btn').prop('disabled', false).show();
+                            
+                            // Dispatch button - enabled only for pending, processing, or payment_confirmed orders
+                            if (status === 'pending' || status === 'processing' || status === 'payment_confirmed') {
+                                $('#view_dispatch_btn').prop('disabled', false).show();
+                            } else {
+                                $('#view_dispatch_btn').prop('disabled', true);
+                            }
+                            
+                            // Deliver button - enabled only for dispatched orders
+                            if (status === 'dispatched') {
+                                $('#view_deliver_btn').prop('disabled', false).show();
+                            } else {
+                                $('#view_deliver_btn').prop('disabled', true);
+                            }
+                            
+                            // Add button action handlers
+                            $('#view_edit_btn').off('click').on('click', function() {
+                                // Close current modal
+                                $('#view-order-modal').modal('hide');
+                                
+                                // Trigger edit for this order
+                                $('.edit-order[data-id="' + orderId + '"]').click();
+                            });
+                            
+                            $('#view_dispatch_btn').off('click').on('click', function() {
+                                // Close current modal
+                                $('#view-order-modal').modal('hide');
+                                
+                                // Trigger dispatch for this order
+                                $('.dispatch-order[data-id="' + orderId + '"]').click();
+                            });
+                            
+                            $('#view_deliver_btn').off('click').on('click', function() {
+                                // Close current modal
+                                $('#view-order-modal').modal('hide');
+                                
+                                // Trigger mark as delivered for this order
+                                $('.mark-delivered[data-id="' + orderId + '"]').click();
+                            });
                             
                             // Open modal
                             var viewModal = new bootstrap.Modal(document.getElementById('view-order-modal'));
                             viewModal.show();
+                        } else {
+                            alert('Error loading order details: ' + response.data);
                         }
+                    },
+                    error: function() {
+                        alert('Failed to load order details. Please try again.');
                     }
                 });
             });
@@ -406,12 +653,17 @@ function kwetupizza_render_order_management() {
             $('#edit-order-form').submit(function(e) {
                 e.preventDefault();
                 var formData = $(this).serialize();
+                
+                console.log('Form submission data:', formData); // Debug log
+                
                 // Save edited order via Ajax
                 $.ajax({
                     url: ajaxurl,
                     method: 'POST',
                     data: formData + '&action=kwetupizza_update_order&send_notification=true',
                     success: function(response) {
+                        console.log('Server response:', response); // Debug log
+                        
                         if (response.success) {
                             // Close modal
                             var editModal = bootstrap.Modal.getInstance(document.getElementById('edit-order-modal'));
@@ -423,8 +675,12 @@ function kwetupizza_render_order_management() {
                             // Reload page
                             location.reload();
                         } else {
-                            alert('Failed to update order.');
+                            alert('Failed to update order: ' + (response.data || 'Unknown error'));
                         }
+                    },
+                    error: function(xhr, status, error) {
+                        console.error('AJAX error:', status, error);
+                        alert('Failed to update order due to a server error. Please try again.');
                     }
                 });
             });
@@ -557,21 +813,51 @@ add_action('wp_ajax_kwetupizza_get_order', 'kwetupizza_get_order');
 
 // Ajax handler to update order
 function kwetupizza_update_order() {
-    check_ajax_referer('kwetupizza_order_nonce', '_ajax_nonce');
+    // Verify the nonce
+    if (!check_ajax_referer('kwetupizza_order_nonce', '_ajax_nonce', false)) {
+        wp_send_json_error('Security verification failed. Please refresh the page and try again.');
+        return;
+    }
+
+    // Check if the necessary data exists
+    if (!isset($_POST['order_id']) || empty($_POST['order_id'])) {
+        wp_send_json_error('Order ID is missing.');
+        return;
+    }
 
     global $wpdb;
     $order_id = intval($_POST['order_id']);
-    $customer_name = sanitize_text_field($_POST['customer_name']);
-    $customer_phone = sanitize_text_field($_POST['customer_phone']);
-    $delivery_address = sanitize_text_field($_POST['delivery_address']);
-    $total = floatval($_POST['total']);
-    $status = sanitize_text_field($_POST['status']);
+    
+    // Check if the order exists
+    $order_exists = $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$wpdb->prefix}kwetupizza_orders WHERE id = %d", $order_id));
+    if ($order_exists == 0) {
+        wp_send_json_error('Order not found. It may have been deleted.');
+        return;
+    }
+    
+    // Sanitize inputs
+    $customer_name = isset($_POST['customer_name']) ? sanitize_text_field($_POST['customer_name']) : '';
+    $customer_phone = isset($_POST['customer_phone']) ? sanitize_text_field($_POST['customer_phone']) : '';
+    $delivery_address = isset($_POST['delivery_address']) ? sanitize_text_field($_POST['delivery_address']) : '';
+    $total = isset($_POST['total']) ? floatval($_POST['total']) : 0;
+    $status = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
     $send_notification = isset($_POST['send_notification']) && $_POST['send_notification'] === 'true';
+
+    // Validate required fields
+    if (empty($customer_name) || empty($customer_phone) || empty($delivery_address) || $total <= 0 || empty($status)) {
+        wp_send_json_error('All fields are required. Please fill in all details.');
+        return;
+    }
 
     $orders_table = $wpdb->prefix . 'kwetupizza_orders';
     
+    // Get previous status for notification purposes
     $previous_status = $wpdb->get_var($wpdb->prepare("SELECT status FROM $orders_table WHERE id = %d", $order_id));
 
+    // Log the update attempt
+    error_log('Attempting to update order #' . $order_id . ' with status: ' . $status);
+
+    // Perform the update operation
     $updated = $wpdb->update(
         $orders_table,
         array(
@@ -585,15 +871,28 @@ function kwetupizza_update_order() {
         array('id' => $order_id)
     );
 
+    // Handle the update result
     if ($updated !== false) {
-        // Send notification if status has changed and notifications are enabled
+        // If status has changed, send notification
         if ($send_notification && $previous_status !== $status) {
-            kwetupizza_notify_customer($order_id, $status);
+            if (function_exists('kwetupizza_notify_customer')) {
+                $notification_sent = kwetupizza_notify_customer($order_id, $status);
+                error_log('Notification for order #' . $order_id . ' ' . ($notification_sent ? 'sent' : 'failed'));
+            } else {
+                error_log('Notification function not available for order #' . $order_id);
+            }
         }
         
         wp_send_json_success('Order updated successfully.');
     } else {
-        wp_send_json_error('Failed to update order.');
+        // Check if it's a non-change that appears as a failure
+        if ($wpdb->last_error) {
+            error_log('Database error during order update: ' . $wpdb->last_error);
+            wp_send_json_error('Database error: ' . $wpdb->last_error);
+        } else {
+            // No DB error usually means no rows were affected (no changes)
+            wp_send_json_success('No changes were made to the order.');
+        }
     }
 }
 add_action('wp_ajax_kwetupizza_update_order', 'kwetupizza_update_order');
@@ -659,4 +958,38 @@ function kwetupizza_mark_delivered() {
     }
 }
 add_action('wp_ajax_kwetupizza_mark_delivered', 'kwetupizza_mark_delivered');
+
+// Ajax handler to get order details with items
+function kwetupizza_get_order_details() {
+    check_ajax_referer('kwetupizza_order_nonce', '_ajax_nonce');
+
+    global $wpdb;
+    $order_id = intval($_POST['order_id']);
+    $orders_table = $wpdb->prefix . 'kwetupizza_orders';
+    $order_items_table = $wpdb->prefix . 'kwetupizza_order_items';
+    $products_table = $wpdb->prefix . 'kwetupizza_products';
+
+    // Get order data
+    $order = $wpdb->get_row($wpdb->prepare("SELECT * FROM $orders_table WHERE id = %d", $order_id));
+
+    if (!$order) {
+        wp_send_json_error('Order not found.');
+        return;
+    }
+
+    // Get order items
+    $items = $wpdb->get_results($wpdb->prepare("
+        SELECT oi.*, p.product_name 
+        FROM $order_items_table oi
+        LEFT JOIN $products_table p ON oi.product_id = p.id
+        WHERE oi.order_id = %d
+    ", $order_id));
+
+    // Send response with order and items
+    wp_send_json_success(array(
+        'order' => $order,
+        'items' => $items
+    ));
+}
+add_action('wp_ajax_kwetupizza_get_order_details', 'kwetupizza_get_order_details');
 ?>
