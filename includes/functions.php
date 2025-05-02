@@ -1,15 +1,15 @@
 <?php
+// Prevent direct access and ensure WordPress is loaded
+if (!defined('ABSPATH')) {
+    require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/wp-load.php');
+}
+
 /**
  * KwetuPizza Core Functions
  * 
  * This file contains all the core functions for the KwetuPizza plugin.
  * Functions are organized by category for better maintainability.
  */
-
-// Prevent direct access
-if (!defined('ABSPATH')) {
-    exit;
-}
 
 // ========================
 // DATABASE FUNCTIONS
@@ -24,7 +24,7 @@ function kwetupizza_create_tables() {
     $charset_collate = $wpdb->get_charset_collate();
 
         // Include WordPress upgrade functions
-        require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+        require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/wp-admin/includes/upgrade.php');
 
     // Users Table
     $users_table = $wpdb->prefix . 'kwetupizza_users';
@@ -108,9 +108,11 @@ function kwetupizza_create_tables() {
         currency varchar(10) NOT NULL,
         payment_provider varchar(50) NOT NULL,
         transaction_reference varchar(100) DEFAULT '',
+        tx_ref varchar(100) DEFAULT '',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
         PRIMARY KEY  (id),
+        UNIQUE KEY (tx_ref),
         FOREIGN KEY (order_id) REFERENCES {$wpdb->prefix}kwetupizza_orders(id) ON DELETE CASCADE
     ) $charset_collate;";
     dbDelta($sql);
@@ -692,7 +694,23 @@ function kwetupizza_process_successful_payment($data) {
     $orders_table = $wpdb->prefix . 'kwetupizza_orders';
     
     $tx_ref = $data['tx_ref'];
-    $order_id = intval(str_replace('order-', '', $tx_ref));
+    
+    // Extract order ID from tx_ref (format could be order_ID or order-ID or order-ID-TIMESTAMP)
+    preg_match('/order[-_](\d+)/', $tx_ref, $matches);
+    $order_id = isset($matches[1]) ? (int)$matches[1] : 0;
+    
+    // If the new format with timestamp is used
+    if ($order_id === 0 && strpos($tx_ref, '-') !== false) {
+        $parts = explode('-', $tx_ref);
+        if (count($parts) >= 2 && $parts[0] === 'order') {
+            $order_id = (int)$parts[1];
+        }
+    }
+    
+    if ($order_id === 0) {
+        kwetupizza_log("Failed to extract order ID from tx_ref: $tx_ref", 'error');
+        return false;
+    }
     
     // Update transaction status
     $wpdb->update(
@@ -882,7 +900,22 @@ if (!function_exists('kwetupizza_handle_failed_payment')) {
         $transactions_table = $wpdb->prefix . 'kwetupizza_transactions';
         $orders_table = $wpdb->prefix . 'kwetupizza_orders';
         
-        $order_id = intval(str_replace('order-', '', $tx_ref));
+        // Extract order ID from tx_ref (format could be order_ID or order-ID or order-ID-TIMESTAMP)
+        preg_match('/order[-_](\d+)/', $tx_ref, $matches);
+        $order_id = isset($matches[1]) ? (int)$matches[1] : 0;
+        
+        // If the new format with timestamp is used
+        if ($order_id === 0 && strpos($tx_ref, '-') !== false) {
+            $parts = explode('-', $tx_ref);
+            if (count($parts) >= 2 && $parts[0] === 'order') {
+                $order_id = (int)$parts[1];
+            }
+        }
+        
+        if ($order_id === 0) {
+            kwetupizza_log("Failed to extract order ID from tx_ref: $tx_ref", 'error');
+            return false;
+        }
         
         // Get order details for better context
         $order = $wpdb->get_row($wpdb->prepare(
@@ -1453,7 +1486,6 @@ if (!function_exists('kwetupizza_generate_mobile_money_push')) {
             kwetupizza_log("Calculated total from cart: $total TZS", 'info', 'payment.log');
         }
 
-        $tx_ref = 'order_' . time();  // Unique transaction reference
         $email = kwetupizza_get_customer_email($from);
         $network = $context['payment_provider'];
         
@@ -1461,10 +1493,24 @@ if (!function_exists('kwetupizza_generate_mobile_money_push')) {
 
         // Save order in database first
         $order_id = kwetupizza_save_order_to_db($from, $cart, $address, $total, $context);
-        if ($order_id) {
-            // Use order ID in the transaction reference
-            $tx_ref = 'order-' . $order_id;
-            kwetupizza_log("Created order #$order_id with tx_ref: $tx_ref", 'info', 'payment.log');
+        if (!$order_id) {
+            kwetupizza_log("Failed to create order record", 'error', 'payment.log');
+            kwetupizza_send_whatsapp_message($from, "Error: Unable to create your order. Please try again later or contact support.");
+            return false;
+        }
+        
+        // Get the tx_ref from the transactions table
+        $tx_ref = $wpdb->get_var($wpdb->prepare(
+            "SELECT tx_ref FROM {$wpdb->prefix}kwetupizza_transactions WHERE order_id = %d",
+            $order_id
+        ));
+        
+        if (empty($tx_ref)) {
+            // Fallback in case tx_ref is not found
+            $tx_ref = 'order-' . $order_id . '-' . time();
+            kwetupizza_log("Created fallback tx_ref: $tx_ref", 'info', 'payment.log');
+        } else {
+            kwetupizza_log("Using existing tx_ref: $tx_ref for order #$order_id", 'info', 'payment.log');
         }
 
         $body = array(
@@ -1575,6 +1621,9 @@ if (!function_exists('kwetupizza_save_order_to_db')) {
             );
         }
         
+        // Generate unique transaction reference
+        $tx_ref = 'order-' . $order_id . '-' . time();
+        
         // Create transaction record
         $wpdb->insert(
             $transactions_table,
@@ -1586,6 +1635,7 @@ if (!function_exists('kwetupizza_save_order_to_db')) {
                 'amount' => $total,
                 'currency' => 'TZS',
                 'payment_provider' => 'Flutterwave',
+                'tx_ref' => $tx_ref,
                 'created_at' => current_time('mysql'),
                 'updated_at' => current_time('mysql')
             ]
@@ -1609,8 +1659,17 @@ if (!function_exists('kwetupizza_confirm_payment_and_notify')) {
             global $wpdb;
             $tx_ref = $transaction_data['tx_ref'];
 
-            preg_match('/order_(\d+)/', $tx_ref, $matches);
+            // Extract order ID from tx_ref (format could be order_ID or order-ID or order-ID-TIMESTAMP)
+            preg_match('/order[-_](\d+)/', $tx_ref, $matches);
             $order_id = isset($matches[1]) ? $matches[1] : null;
+            
+            // If the new format with timestamp is used
+            if (!$order_id && strpos($tx_ref, '-') !== false) {
+                $parts = explode('-', $tx_ref);
+                if (count($parts) >= 2 && $parts[0] === 'order') {
+                    $order_id = $parts[1];
+                }
+            }
 
             if ($order_id) {
                 $orders_table = $wpdb->prefix . 'kwetupizza_orders';
