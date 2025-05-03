@@ -148,12 +148,12 @@ function kwetupizza_render_order_management() {
                                             <th width="15%">Amount</th>
                                             <th width="15%">Status</th>
                                             <th width="20%">Actions</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        <?php if (!empty($orders)): ?>
-                                            <?php foreach ($orders as $order): ?>
-                                                <tr>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($orders)): ?>
+                    <?php foreach ($orders as $order): ?>
+                        <tr>
                                                     <td class="compact-text">#<?php echo esc_html($order->id); ?></td>
                                                     <td class="compact-text"><?php echo esc_html(date('M d, H:i', strtotime($order->order_date))); ?></td>
                                                     <td class="customer-info compact-text">
@@ -217,21 +217,21 @@ function kwetupizza_render_order_management() {
                                                                 </li>
                                                             </ul>
                                                         </div>
-                                                    </td>
-                                                </tr>
-                                            <?php endforeach; ?>
-                                        <?php else: ?>
-                                            <tr>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else: ?>
+                    <tr>
                                                 <td colspan="6" class="text-center py-4">
                                                     <div class="text-muted">
                                                         <i class="dashicons dashicons-clipboard"></i><br>
                                                         No orders found
                                                     </div>
                                                 </td>
-                                            </tr>
-                                        <?php endif; ?>
-                                    </tbody>
-                                </table>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+        </table>
                             </div>
                         </div>
                     </div>
@@ -405,8 +405,8 @@ function kwetupizza_render_order_management() {
                         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                     </div>
                     <div class="modal-body">
-                        <form id="edit-order-form">
-                            <input type="hidden" name="order_id" id="order_id">
+            <form id="edit-order-form">
+                <input type="hidden" name="order_id" id="order_id">
                             <input type="hidden" name="_ajax_nonce" value="<?php echo wp_create_nonce('kwetupizza_order_nonce'); ?>">
                             <div class="mb-3">
                                 <label for="edit_customer_name" class="form-label">Customer Name</label>
@@ -427,13 +427,13 @@ function kwetupizza_render_order_management() {
                             <div class="mb-3">
                                 <label for="edit_status" class="form-label">Status</label>
                                 <select class="form-select" name="status" id="edit_status">
-                                    <option value="pending">Pending</option>
+                    <option value="pending">Pending</option>
                                     <option value="processing">Processing</option>
                                     <option value="payment_confirmed">Payment Confirmed</option>
                                     <option value="dispatched">Dispatched</option>
                                     <option value="delivered">Delivered</option>
-                                    <option value="completed">Completed</option>
-                                    <option value="cancelled">Cancelled</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
                                 </select>
                             </div>
                         </form>
@@ -464,7 +464,7 @@ function kwetupizza_render_order_management() {
                                     <span class="badge bg-secondary" id="delivery_time_display">30 minutes</span>
                                 </div>
                             </div>
-                        </form>
+            </form>
                     </div>
                     <div class="modal-footer">
                         <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
@@ -857,7 +857,7 @@ function kwetupizza_update_order() {
     }
 
     $orders_table = $wpdb->prefix . 'kwetupizza_orders';
-    
+
     // Get previous status for notification purposes
     $previous_status = $wpdb->get_var($wpdb->prepare("SELECT status FROM $orders_table WHERE id = %d", $order_id));
 
@@ -915,7 +915,7 @@ function kwetupizza_delete_order() {
 
     // First delete order items
     $wpdb->delete($order_items_table, array('order_id' => $order_id));
-    
+
     // Then delete order
     $deleted = $wpdb->delete($orders_table, array('id' => $order_id));
 

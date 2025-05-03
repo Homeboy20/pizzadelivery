@@ -10,9 +10,15 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Include core functions file to ensure access to helper functions
+if (file_exists(dirname(__FILE__) . '/functions.php')) {
+    require_once dirname(__FILE__) . '/functions.php';
+}
+
 /**
  * Register all shortcodes
  */
+if (!function_exists('kwetupizza_register_shortcodes')) {
 function kwetupizza_register_shortcodes() {
     add_shortcode('kwetupizza_menu', 'kwetupizza_menu_shortcode');
     add_shortcode('kwetupizza_order_tracking', 'kwetupizza_order_tracking_shortcode');
@@ -21,6 +27,7 @@ function kwetupizza_register_shortcodes() {
     add_shortcode('kwetupizza_feedback', 'kwetupizza_feedback_shortcode');
 }
 add_action('init', 'kwetupizza_register_shortcodes');
+}
 
 /**
  * Menu shortcode

@@ -12,7 +12,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Include core functions
+// Include core functions file - use require_once to prevent duplicate function definitions
 if (file_exists(dirname(__FILE__) . '/functions.php')) {
     require_once dirname(__FILE__) . '/functions.php';
 }

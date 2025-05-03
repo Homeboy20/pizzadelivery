@@ -100,7 +100,7 @@ require_once KWETUPIZZA_PLUGIN_DIR . 'includes/shortcodes.php';
 
 // Include PayPal checkout
 include_once(plugin_dir_path(__FILE__) . 'includes/paypal-checkout.php');
-
+    
 // Register REST API routes
 add_action('rest_api_init', 'kwetupizza_register_api_routes');
 
@@ -122,12 +122,12 @@ function kwetupizza_activate() {
     // Create required pages
     if (function_exists('kwetupizza_create_pages')) {
         kwetupizza_create_pages();
-    }
-    
+}
+
     // Add default delivery zones if needed
     if (function_exists('kwetupizza_create_sample_delivery_zones')) {
         kwetupizza_create_sample_delivery_zones();
-    }
+}
 
     // Set the plugin version
     update_option('kwetupizza_version', KWETUPIZZA_VERSION);

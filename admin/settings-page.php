@@ -1,4 +1,9 @@
 <?php
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
 // Add the settings page for KwetuPizza
 function kwetupizza_render_settings_page() {
     // Process form submissions for each integration
@@ -31,6 +36,13 @@ function kwetupizza_render_settings_page() {
         update_option('kwetupizza_nextsms_password', sanitize_text_field($_POST['kwetupizza_nextsms_password']));
         update_option('kwetupizza_nextsms_sender_id', sanitize_text_field($_POST['kwetupizza_nextsms_sender_id']));
         echo '<div class="notice notice-success is-dismissible"><p>NextSMS settings saved successfully!</p></div>';
+    }
+    
+    if (isset($_POST['save_paypal'])) {
+        update_option('kwetupizza_paypal_client_id', sanitize_text_field($_POST['kwetupizza_paypal_client_id']));
+        update_option('kwetupizza_paypal_secret', sanitize_text_field($_POST['kwetupizza_paypal_secret']));
+        update_option('kwetupizza_paypal_sandbox', isset($_POST['kwetupizza_paypal_sandbox']) ? 1 : 0);
+        echo '<div class="notice notice-success is-dismissible"><p>PayPal settings saved successfully!</p></div>';
     }
     
     // Get active tab from URL or set default
@@ -220,7 +232,7 @@ function kwetupizza_render_settings_page() {
 
             <ul class="nav-tabs">
                 <li class="active"><a href="#whatsapp-tab">WhatsApp Provider</a></li>
-                <li><a href="#payment-tab">Payment Gateway</a></li>
+                <li><a href="#payment-tab">Payment Gateways</a></li>
                         <li><a href="#sms-tab">Bulk SMS (NextSMS)</a></li>
             </ul>
 
@@ -289,6 +301,41 @@ function kwetupizza_render_settings_page() {
                                     <input type="submit" name="save_flutterwave" class="button-primary" value="Save Flutterwave Settings" />
                                 </p>
                             </form>
+                            
+                            <hr>
+                            
+                            <h3>PayPal Payment Gateway</h3>
+                            <form method="post" action="">
+                                <table class="form-table">
+                                    <tr>
+                                        <th scope="row">Client ID</th>
+                                        <td>
+                                            <input type="text" name="kwetupizza_paypal_client_id" value="<?php echo esc_attr(get_option('kwetupizza_paypal_client_id')); ?>" />
+                                            <p class="description">Client ID from your PayPal Developer account</p>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">Secret Key</th>
+                                        <td>
+                                            <input type="password" name="kwetupizza_paypal_secret" value="<?php echo esc_attr(get_option('kwetupizza_paypal_secret')); ?>" />
+                                            <p class="description">Secret key from your PayPal Developer account</p>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th scope="row">Sandbox Mode</th>
+                                        <td>
+                                            <label>
+                                                <input type="checkbox" name="kwetupizza_paypal_sandbox" value="1" <?php checked(get_option('kwetupizza_paypal_sandbox', 1), 1); ?> />
+                                                Enable PayPal Sandbox (test) mode
+                                            </label>
+                                            <p class="description">Check this to use PayPal Sandbox for testing. Uncheck for live payments.</p>
+                                        </td>
+                                    </tr>
+                                </table>
+                                <p class="submit">
+                                    <input type="submit" name="save_paypal" class="button-primary" value="Save PayPal Settings" />
+                                </p>
+                            </form>
                 </div>
 
                         <!-- NextSMS Integration -->
@@ -332,7 +379,7 @@ function kwetupizza_render_settings_page() {
                 </div>
             </div>
         <?php endif; ?>
-    </div>
+        </div>
     
     <!-- Test Notifications Button -->
     <div class="kwetu-admin-box">
@@ -510,6 +557,11 @@ function kwetupizza_register_settings() {
     register_setting('kwetupizza_settings_group', 'kwetupizza_flutterwave_secret_key');
     register_setting('kwetupizza_settings_group', 'kwetupizza_flutterwave_encryption_key');
     register_setting('kwetupizza_settings_group', 'kwetupizza_flw_webhook_secret');
+
+    // PayPal settings
+    register_setting('kwetupizza_settings_group', 'kwetupizza_paypal_client_id');
+    register_setting('kwetupizza_settings_group', 'kwetupizza_paypal_secret');
+    register_setting('kwetupizza_settings_group', 'kwetupizza_paypal_sandbox');
 
     // NextSMS settings
     register_setting('kwetupizza_settings_group', 'kwetupizza_nextsms_username');
