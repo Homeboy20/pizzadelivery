@@ -1124,6 +1124,12 @@ if (!function_exists('kwetupizza_handle_whatsapp_message')) {
             } else if ($awaiting === 'menu_selection') {
                 kwetupizza_process_order($from, $message);
                 return;
+            } else if ($awaiting === 'quantity') {
+                // Get the last product in the cart
+                $last_product = end($context['cart']);
+                $product_id = $last_product['product_id'];
+                kwetupizza_confirm_order_and_request_address($from, $product_id, intval(trim($message)));
+                return;
             } else if ($awaiting === 'product_quantity') {
                 kwetupizza_confirm_order_and_request_address($from, $context['product_id'], intval(trim($message)));
                 return;
