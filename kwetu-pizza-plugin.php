@@ -122,12 +122,12 @@ function kwetupizza_activate() {
     // Create required pages
     if (function_exists('kwetupizza_create_pages')) {
         kwetupizza_create_pages();
-}
+    }
 
     // Add default delivery zones if needed
     if (function_exists('kwetupizza_create_sample_delivery_zones')) {
         kwetupizza_create_sample_delivery_zones();
-}
+    }
 
     // Set the plugin version
     update_option('kwetupizza_version', KWETUPIZZA_VERSION);
@@ -161,3 +161,14 @@ function kwetupizza_check_database_update() {
     }
 }
 add_action('plugins_loaded', 'kwetupizza_check_database_update');
+
+// Include required files
+require_once plugin_dir_path(__FILE__) . 'includes/functions.php';
+require_once plugin_dir_path(__FILE__) . 'includes/admin/admin-functions.php';
+require_once plugin_dir_path(__FILE__) . 'includes/admin/settings.php';
+require_once plugin_dir_path(__FILE__) . 'includes/admin/menu.php';
+require_once plugin_dir_path(__FILE__) . 'includes/admin/dashboard.php';
+require_once plugin_dir_path(__FILE__) . 'includes/ajax-handlers.php';
+require_once plugin_dir_path(__FILE__) . 'includes/flutterwave-api.php';
+require_once plugin_dir_path(__FILE__) . 'includes/whatsapp-handler.php';
+require_once plugin_dir_path(__FILE__) . 'interactive-buttons.php';
