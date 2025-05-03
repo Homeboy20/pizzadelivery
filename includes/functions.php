@@ -4228,3 +4228,574 @@ if (!function_exists('kwetupizza_finalize_order')) {
         kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'payment_provider']));
     }
 }
+
+/**
+ * Check if a message is a greeting
+ */
+if (!function_exists('kwetupizza_is_greeting')) {
+    function kwetupizza_is_greeting($message) {
+        $message = strtolower(trim($message));
+        $greetings = array(
+            'hi', 'hey', 'hello', 'hola', 'habari', 'jambo', 'sasa', 'mambo', 
+            'good morning', 'good afternoon', 'good evening', 
+            'start', 'begin', 'howdy', 'yo', 'hujambo', 'salaam'
+        );
+        
+        foreach ($greetings as $greeting) {
+            if (strpos($message, $greeting) !== false || $message === $greeting) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+}
+
+/**
+ * Send menu to user (wrapper for kwetupizza_send_menu_categories)
+ */
+if (!function_exists('kwetupizza_send_menu')) {
+    function kwetupizza_send_menu($from) {
+        // Call the existing menu categories function
+        kwetupizza_send_menu_categories($from);
+    }
+}
+
+/**
+ * Start a new order process
+ */
+if (!function_exists('kwetupizza_start_order')) {
+    function kwetupizza_start_order($from) {
+        // Get user
+        $user = kwetupizza_get_or_create_user($from);
+        
+        // Get user's first name for personalization
+        $first_name = isset($user->name) ? explode(' ', $user->name)[0] : 'there';
+        
+        // Create welcome message
+        $message = "Great, $first_name! Let's start your pizza order. 🍕\n\n";
+        $message .= "Here's our menu categories:\n\n";
+        
+        // Show menu to start the ordering process
+        kwetupizza_send_whatsapp_message($from, $message);
+        kwetupizza_send_menu_categories($from);
+        
+        // Set conversation context to expect category selection
+        kwetupizza_set_conversation_context($from, ['awaiting' => 'category_selection']);
+    }
+}
+
+/**
+ * Send help information to user
+ */
+if (!function_exists('kwetupizza_send_help')) {
+    function kwetupizza_send_help($from) {
+        // Reuse the existing help message function
+        kwetupizza_send_help_message($from);
+    }
+}
+
+/**
+ * Send default response for unrecognized messages
+ */
+if (!function_exists('kwetupizza_send_default_response')) {
+    function kwetupizza_send_default_response($from) {
+        // Get user
+        $user = kwetupizza_get_or_create_user($from);
+        
+        // Get user's first name for personalization
+        $first_name = isset($user->name) ? explode(' ', $user->name)[0] : 'there';
+        
+        $message = "I'm sorry, $first_name. I didn't understand that message. 😕\n\n";
+        $message .= "Here are some things you can ask me:\n";
+        $message .= "• Type *menu* to see our menu\n";
+        $message .= "• Type *order* to place a new order\n";
+        $message .= "• Type *status* to check your order status\n";
+        $message .= "• Type *help* for assistance\n\n";
+        $message .= "What would you like to do?";
+        
+        kwetupizza_send_whatsapp_message($from, $message);
+    }
+}
+
+/**
+ * Handle item selection from menu
+ */
+if (!function_exists('kwetupizza_handle_item_selection')) {
+    function kwetupizza_handle_item_selection($from, $message) {
+        global $wpdb;
+        $products_table = $wpdb->prefix . 'kwetupizza_products';
+        
+        // Try to find the product
+        $product_id = intval(trim($message));
+        
+        if ($product_id > 0) {
+            // Get product information
+            $product = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM $products_table WHERE id = %d",
+                $product_id
+            ));
+            
+            if ($product) {
+                // Ask for quantity
+                $message = "*{$product->name}* - " . kwetupizza_format_currency($product->price) . "\n\n";
+                $message .= "{$product->description}\n\n";
+                $message .= "How many would you like to order? Please enter a number (e.g., 1, 2, 3).";
+                
+                kwetupizza_send_whatsapp_message($from, $message);
+                
+                // Set context to expect quantity input
+                kwetupizza_set_conversation_context($from, [
+                    'awaiting' => 'item_quantity',
+                    'product_id' => $product_id,
+                    'product_name' => $product->name,
+                    'product_price' => $product->price
+                ]);
+                
+                return;
+            }
+        }
+        
+        // If we get here, either the product ID was invalid or the product wasn't found
+        $message = "I'm sorry, but I couldn't find that item. Please select a valid item number from the menu.";
+        kwetupizza_send_whatsapp_message($from, $message);
+        kwetupizza_send_menu_categories($from);
+    }
+}
+
+/**
+ * Handle item quantity input
+ */
+if (!function_exists('kwetupizza_handle_item_quantity')) {
+    function kwetupizza_handle_item_quantity($from, $message, $context) {
+        $quantity = intval(trim($message));
+        
+        if ($quantity <= 0) {
+            kwetupizza_send_whatsapp_message($from, "Please enter a valid quantity (a positive number).");
+            return;
+        }
+        
+        // Get product details from context
+        $product_id = $context['product_id'];
+        $product_name = $context['product_name'];
+        $product_price = $context['product_price'];
+        
+        // Initialize cart if it doesn't exist
+        if (!isset($context['cart'])) {
+            $context['cart'] = [];
+        }
+        
+        // Add item to cart
+        $context['cart'][] = [
+            'product_id' => $product_id,
+            'name' => $product_name,
+            'price' => $product_price,
+            'quantity' => $quantity
+        ];
+        
+        // Calculate subtotal
+        $item_total = $product_price * $quantity;
+        $cart_total = 0;
+        
+        foreach ($context['cart'] as $item) {
+            $cart_total += $item['price'] * $item['quantity'];
+        }
+        
+        // Update context with cart
+        $context['awaiting'] = 'cart_action';
+        kwetupizza_set_conversation_context($from, $context);
+        
+        // Send confirmation and ask if they want to add more items
+        $message = "✅ Added {$quantity}x {$product_name} (". kwetupizza_format_currency($item_total) .") to your cart.\n\n";
+        $message .= "*Current Cart Total:* " . kwetupizza_format_currency($cart_total) . "\n\n";
+        $message .= "Would you like to:\n";
+        $message .= "1️⃣ *Add more items* to your order\n";
+        $message .= "2️⃣ *Proceed to checkout*\n\n";
+        $message .= "Please reply with 1 or 2, or the word 'add' or 'checkout'.";
+        
+        kwetupizza_send_whatsapp_message($from, $message);
+    }
+}
+
+/**
+ * Handle cart action (add more items or checkout)
+ */
+if (!function_exists('kwetupizza_handle_cart_action')) {
+    function kwetupizza_handle_cart_action($from, $message) {
+        $message = strtolower(trim($message));
+        
+        if ($message === '1' || $message === 'add' || $message === 'add more' || $message === 'more') {
+            // User wants to add more items
+            $context = kwetupizza_get_conversation_context($from);
+            $context['awaiting'] = 'category_selection';
+            kwetupizza_set_conversation_context($from, $context);
+            
+            // Show menu categories
+            kwetupizza_send_whatsapp_message($from, "Great! Let's add more to your order. Please select from our menu:");
+            kwetupizza_send_menu_categories($from);
+        } else if ($message === '2' || $message === 'checkout' || $message === 'proceed' || $message === 'done') {
+            // User wants to checkout
+            $context = kwetupizza_get_conversation_context($from);
+            
+            // Calculate cart total
+            $cart_total = 0;
+            if (isset($context['cart']) && is_array($context['cart'])) {
+                foreach ($context['cart'] as $item) {
+                    $cart_total += $item['price'] * $item['quantity'];
+                }
+            } else {
+                // No cart items
+                kwetupizza_send_whatsapp_message($from, "Your cart is empty. Let's add some items first!");
+                kwetupizza_send_menu_categories($from);
+                return;
+            }
+            
+            // Ask for delivery address
+            $message = "Great! Let's proceed with your order.\n\n";
+            $message .= "*Your Cart Total:* " . kwetupizza_format_currency($cart_total) . "\n\n";
+            $message .= "Please enter your delivery address in detail to ensure we can find your location easily.";
+            
+            kwetupizza_send_whatsapp_message($from, $message);
+            
+            // Update context
+            $context['awaiting'] = 'delivery_address';
+            kwetupizza_set_conversation_context($from, $context);
+        } else {
+            // Invalid response
+            kwetupizza_send_whatsapp_message($from, 
+                "I didn't understand that. Please reply with:\n" .
+                "1 or 'add' to add more items\n" .
+                "2 or 'checkout' to proceed to checkout"
+            );
+        }
+    }
+}
+
+/**
+ * Handle delivery address input
+ */
+if (!function_exists('kwetupizza_handle_delivery_address')) {
+    function kwetupizza_handle_delivery_address($from, $message) {
+        if (empty(trim($message))) {
+            kwetupizza_send_whatsapp_message($from, "Please provide a valid delivery address so we can deliver your order.");
+            return;
+        }
+        
+        $context = kwetupizza_get_conversation_context($from);
+        
+        // Store address in context
+        $context['delivery_address'] = trim($message);
+        $context['awaiting'] = 'delivery_phone';
+        kwetupizza_set_conversation_context($from, $context);
+        
+        // Ask if we should use the same WhatsApp number for delivery
+        $message = "Thank you for the address.\n\n";
+        $message .= "Should we use your current WhatsApp number (" . kwetupizza_sanitize_phone($from) . ") for delivery contact?\n\n";
+        $message .= "1️⃣ Yes, use this number\n";
+        $message .= "2️⃣ No, I'll provide a different number";
+        
+        kwetupizza_send_whatsapp_message($from, $message);
+    }
+}
+
+/**
+ * Handle delivery phone input
+ */
+if (!function_exists('kwetupizza_handle_delivery_phone')) {
+    function kwetupizza_handle_delivery_phone($from, $message) {
+        $message = trim(strtolower($message));
+        $context = kwetupizza_get_conversation_context($from);
+        
+        if ($message === '1' || $message === 'yes' || $message === 'y') {
+            // Use the same WhatsApp number
+            $context['delivery_phone'] = $from;
+        } else if ($message === '2' || $message === 'no' || $message === 'n') {
+            // Ask for a different number
+            kwetupizza_send_whatsapp_message($from, 
+                "Please provide the alternative phone number for delivery contact. " .
+                "Use the format: 255XXXXXXXXX"
+            );
+            $context['awaiting'] = 'delivery_phone_input';
+            kwetupizza_set_conversation_context($from, $context);
+            return;
+        } else if (isset($context['awaiting']) && $context['awaiting'] === 'delivery_phone_input') {
+            // User provided a new phone number
+            // Simple validation (could be more comprehensive)
+            if (preg_match('/^\d{9,15}$/', preg_replace('/[^0-9]/', '', $message))) {
+                $context['delivery_phone'] = kwetupizza_sanitize_phone($message);
+            } else {
+                kwetupizza_send_whatsapp_message($from, 
+                    "That doesn't look like a valid phone number. " .
+                    "Please provide a number in the format: 255XXXXXXXXX"
+                );
+                return;
+            }
+        } else {
+            // Invalid response
+            kwetupizza_send_whatsapp_message($from, 
+                "I didn't understand that. Please reply with:\n" .
+                "1 or 'yes' to use your current WhatsApp number\n" .
+                "2 or 'no' to provide a different number"
+            );
+            return;
+        }
+        
+        // Proceed to payment method selection
+        $context['awaiting'] = 'payment_provider';
+        kwetupizza_set_conversation_context($from, $context);
+        
+        // Calculate cart total
+        $cart_total = 0;
+        foreach ($context['cart'] as $item) {
+            $cart_total += $item['price'] * $item['quantity'];
+        }
+        
+        // Format order summary for display
+        $summary = "*Order Summary*\n\n";
+        foreach ($context['cart'] as $item) {
+            $item_total = $item['price'] * $item['quantity'];
+            $summary .= "{$item['quantity']}x {$item['name']} - " . kwetupizza_format_currency($item_total) . "\n";
+        }
+        $summary .= "\n*Total:* " . kwetupizza_format_currency($cart_total) . "\n";
+        $summary .= "Delivery to: {$context['delivery_address']}\n";
+        $summary .= "Contact: " . kwetupizza_sanitize_phone($context['delivery_phone']) . "\n\n";
+        
+        // Present payment options
+        $message = $summary;
+        $message .= "Please select your payment method:\n\n";
+        $message .= "1️⃣ *Mobile Money* (Tigo Pesa, M-Pesa, Airtel Money)\n";
+        $message .= "2️⃣ *Card Payment* (via PayPal, no account needed)\n\n";
+        $message .= "Reply with 1 or 2, or type 'mobile' or 'card'.";
+        
+        kwetupizza_send_whatsapp_message($from, $message);
+    }
+}
+
+/**
+ * Handle payment mobile number for Flutterwave
+ */
+if (!function_exists('kwetupizza_handle_payment_mobile_number')) {
+    function kwetupizza_handle_payment_mobile_number($from, $message, $context) {
+        $payment_phone = trim($message);
+        
+        // Basic validation - should be improved for production
+        if (empty($payment_phone) || strlen(preg_replace('/[^0-9]/', '', $payment_phone)) < 9) {
+            kwetupizza_send_whatsapp_message($from, 
+                "That doesn't look like a valid phone number. " .
+                "Please provide a mobile money number in the format: 255XXXXXXXXX"
+            );
+            return;
+        }
+        
+        // Sanitize and store the phone number
+        $payment_phone = kwetupizza_sanitize_phone($payment_phone);
+        $context['payment_phone'] = $payment_phone;
+        $context['awaiting'] = 'order_confirmation';
+        kwetupizza_set_conversation_context($from, $context);
+        
+        // Calculate totals
+        $cart_total = 0;
+        foreach ($context['cart'] as $item) {
+            $cart_total += $item['price'] * $item['quantity'];
+        }
+        
+        // Format final order summary
+        $summary = "*Final Order Summary*\n\n";
+        foreach ($context['cart'] as $item) {
+            $item_total = $item['price'] * $item['quantity'];
+            $summary .= "{$item['quantity']}x {$item['name']} - " . kwetupizza_format_currency($item_total) . "\n";
+        }
+        $summary .= "\n*Total:* " . kwetupizza_format_currency($cart_total) . "\n";
+        $summary .= "*Delivery to:* {$context['delivery_address']}\n";
+        $summary .= "*Contact:* " . kwetupizza_sanitize_phone($context['delivery_phone']) . "\n";
+        $summary .= "*Payment:* Mobile Money via " . $payment_phone . "\n\n";
+        
+        // Ask for final confirmation
+        $message = $summary;
+        $message .= "Please confirm your order:\n";
+        $message .= "1️⃣ *Confirm* - Place this order\n";
+        $message .= "2️⃣ *Cancel* - Start over\n\n";
+        $message .= "Reply with 1 to confirm or 2 to cancel.";
+        
+        kwetupizza_send_whatsapp_message($from, $message);
+    }
+}
+
+/**
+ * Handle final order confirmation
+ */
+if (!function_exists('kwetupizza_handle_order_confirmation')) {
+    function kwetupizza_handle_order_confirmation($from, $message, $context) {
+        $response = strtolower(trim($message));
+        
+        if ($response === '1' || $response === 'confirm' || $response === 'yes') {
+            // User confirmed the order
+            kwetupizza_send_whatsapp_message($from, 
+                "🎉 Thank you for your order! We're processing it now.\n\n" .
+                "You'll receive a mobile money payment request shortly. " .
+                "Please complete the payment to confirm your order."
+            );
+            
+            if (isset($context['payment_provider']) && $context['payment_provider'] === 'paypal') {
+                // Handle PayPal payment
+                kwetupizza_handle_payment_provider_paypal($from, $context);
+            } else {
+                // Default to mobile money via Flutterwave
+                kwetupizza_handle_payment_provider_flutterwave($from, $context);
+            }
+            
+            // Set context to order completion
+            $context['awaiting'] = 'order_completion';
+            kwetupizza_set_conversation_context($from, $context);
+            
+        } else if ($response === '2' || $response === 'cancel' || $response === 'no') {
+            // User cancelled the order
+            kwetupizza_send_whatsapp_message($from, 
+                "Order cancelled. No worries! You can start a new order anytime by typing 'order'.\n\n" .
+                "Is there anything else I can help you with?"
+            );
+            
+            // Reset conversation context
+            kwetupizza_set_conversation_context($from, ['state' => 'greeting']);
+            
+        } else {
+            // Invalid response
+            kwetupizza_send_whatsapp_message($from, 
+                "I didn't understand that. Please reply with:\n" .
+                "1 or 'confirm' to place your order\n" .
+                "2 or 'cancel' to cancel your order"
+            );
+        }
+    }
+}
+
+/**
+ * Handle Flutterwave mobile money payment flow
+ */
+if (!function_exists('kwetupizza_handle_payment_provider_flutterwave')) {
+    function kwetupizza_handle_payment_provider_flutterwave($from, $context) {
+        // Check if mobile number is provided for payment
+        if (!isset($context['payment_phone'])) {
+            // Ask for mobile money number
+            $message = "Please enter the mobile money number you wish to use for payment (format: 255XXXXXXXXX):";
+            kwetupizza_send_whatsapp_message($from, $message);
+            
+            // Update context to expect mobile number
+            $context['payment_provider'] = 'flutterwave';
+            $context['awaiting'] = 'payment_mobile_number';
+            kwetupizza_set_conversation_context($from, $context);
+            return;
+        }
+        
+        // Process mobile money payment with Flutterwave
+        $payment_phone = $context['payment_phone'];
+        $cart = isset($context['cart']) ? $context['cart'] : [];
+        $delivery_address = isset($context['delivery_address']) ? $context['delivery_address'] : '';
+        
+        // Calculate total
+        $total = 0;
+        foreach ($cart as $item) {
+            $total += $item['price'] * $item['quantity'];
+        }
+        
+        // Get API key
+        $flw_secret_key = get_option('kwetupizza_flw_secret_key');
+        if (empty($flw_secret_key)) {
+            kwetupizza_log("ERROR: Missing Flutterwave secret key", 'error', 'payment.log');
+            kwetupizza_send_whatsapp_message($from, "Error: Payment gateway not properly configured. Please contact support.");
+            return false;
+        }
+        
+        // Save order to database before payment initiation
+        $order_id = kwetupizza_save_order_to_db($from, $cart, $delivery_address, $total, $context);
+        
+        if (!$order_id) {
+            kwetupizza_log("ERROR: Failed to save order to database", 'error', 'payment.log');
+            kwetupizza_send_whatsapp_message($from, "Error processing your order. Please try again later.");
+            return false;
+        }
+        
+        // Generate unique payment reference
+        $tx_ref = 'order-' . $order_id . '-' . time();
+        
+        // Format phone for Flutterwave
+        $payment_phone = preg_replace('/[^0-9]/', '', $payment_phone);
+        if (strpos($payment_phone, '255') === 0) {
+            $payment_phone = substr($payment_phone, 3); // Remove country code for Flutterwave
+        }
+        
+        // Prepare the API request data
+        $payload = json_encode([
+            'tx_ref' => $tx_ref,
+            'amount' => $total,
+            'currency' => 'TZS',
+            'network' => 'mpesa', // or appropriate network
+            'email' => isset($context['user_email']) ? $context['user_email'] : 'customer@example.com',
+            'phone_number' => $payment_phone,
+            'fullname' => isset($context['user_name']) ? $context['user_name'] : 'Customer',
+            'redirect_url' => kwetupizza_get_callback_url('flutterwave'),
+            'meta' => [
+                'order_id' => $order_id,
+                'delivery_address' => $delivery_address
+            ]
+        ]);
+        
+        // Make API request to Flutterwave
+        $response = wp_remote_post('https://api.flutterwave.com/v3/charges?type=mobile_money_tanzania', [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $flw_secret_key,
+                'Content-Type' => 'application/json'
+            ],
+            'body' => $payload
+        ]);
+
+        // Check for request errors
+        if (is_wp_error($response)) {
+            $error_message = $response->get_error_message();
+            kwetupizza_log("ERROR: Flutterwave API request failed: $error_message", 'error', 'payment.log');
+            kwetupizza_send_whatsapp_message($from, "Error initiating the payment. Please try again later or contact support.");
+            return false;
+        }
+
+        $response_body = wp_remote_retrieve_body($response);
+        $result = json_decode($response_body, true);
+        
+        // Log the response
+        kwetupizza_log("Flutterwave API response: " . print_r($result, true), 'info', 'payment.log');
+        
+        if (isset($result['status']) && $result['status'] === 'success') {
+            // Payment request successful
+            $transaction_id = $result['data']['id'];
+            
+            // Update transaction reference in database
+            kwetupizza_update_transaction_reference($order_id, $tx_ref, $transaction_id);
+            
+            // Send confirmation message
+            $message = "🔒 *Mobile Money Payment* 🔒\n\n";
+            $message .= "We've sent a payment request to your mobile number. ";
+            $message .= "Please check your phone and approve the payment to complete your order.\n\n";
+            $message .= "Once payment is confirmed, we'll start preparing your delicious pizza! 🍕";
+            
+            kwetupizza_send_whatsapp_message($from, $message);
+            
+            // Update conversation context
+            $context['awaiting'] = 'order_completion';
+            $context['order_id'] = $order_id;
+            kwetupizza_set_conversation_context($from, $context);
+            
+            return true;
+        } else {
+            // Payment request failed
+            $error = isset($result['message']) ? $result['message'] : 'Unknown error';
+            kwetupizza_log("ERROR: Flutterwave payment initiation failed: $error", 'error', 'payment.log');
+            
+            $message = "❌ There was a problem initiating your payment.\n\n";
+            $message .= "Please try again later or contact our customer support for assistance.\n\n";
+            $message .= "Your order has been saved, and you can complete it later by asking about your order status.";
+            
+            kwetupizza_send_whatsapp_message($from, $message);
+            
+            return false;
+        }
+    }
+}
