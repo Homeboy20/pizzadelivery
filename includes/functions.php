@@ -1392,12 +1392,19 @@ if (!function_exists('kwetupizza_handle_registration_location')) {
             )
         );
         
-        // Update context
-        $context = ['state' => 'greeting'];
-        kwetupizza_set_conversation_context($from, $context);
+        // Get the user's first name for personalization
+        $first_name = explode(' ', $user_name)[0];
+        
+        // Update context to maintain user info throughout the conversation
+        $new_context = [
+            'state' => 'menu_browsing',
+            'user_name' => $user_name,
+            'first_name' => $first_name,
+            'awaiting' => 'category_selection'
+        ];
+        kwetupizza_set_conversation_context($from, $new_context);
         
         // Send welcome message
-        $first_name = explode(' ', $user_name)[0];
         $message = "🎉 *Registration Complete!* 🎉\n\n";
         $message .= "Thank you, $first_name! Your account has been created.\n\n";
         $message .= "Now, let's see what you'd like to order today:";
@@ -1414,8 +1421,18 @@ if (!function_exists('kwetupizza_handle_registration_location')) {
  */
 if (!function_exists('kwetupizza_send_menu_categories')) {
     function kwetupizza_send_menu_categories($from) {
+        // Check if we have context with user name
+        $context = kwetupizza_get_conversation_context($from);
+        $first_name = isset($context['first_name']) ? $context['first_name'] : '';
+        
         $message = "🍽️ *Our Menu Categories* 🍽️\n\n";
-        $message .= "Please select a category by typing the number:\n\n";
+        
+        if (!empty($first_name)) {
+            $message .= "{$first_name}, please select a category by typing the number:\n\n";
+        } else {
+            $message .= "Please select a category by typing the number:\n\n";
+        }
+        
         $message .= "1. 🍕 Pizzas\n";
         $message .= "2. 🥤 Drinks\n";
         $message .= "3. 🍰 Desserts\n";
@@ -1423,8 +1440,9 @@ if (!function_exists('kwetupizza_send_menu_categories')) {
         
         kwetupizza_send_whatsapp_message($from, $message);
         
-        // Set context to await category selection
-        kwetupizza_set_conversation_context($from, ['awaiting' => 'category_selection']);
+        // Set context to await category selection while preserving user info
+        $updated_context = array_merge($context, ['awaiting' => 'category_selection']);
+        kwetupizza_set_conversation_context($from, $updated_context);
     }
 }
 
@@ -1436,6 +1454,10 @@ if (!function_exists('kwetupizza_handle_category_selection')) {
         global $wpdb;
         $table_name = $wpdb->prefix . 'kwetupizza_products';
         
+        // Get current context to retrieve user name if available
+        $context = kwetupizza_get_conversation_context($from);
+        $first_name = isset($context['first_name']) ? $context['first_name'] : '';
+        
         // Map selection to category
         $categories = [
             '1' => 'Pizza',
@@ -1445,7 +1467,10 @@ if (!function_exists('kwetupizza_handle_category_selection')) {
         ];
         
         if (!isset($categories[$selection])) {
-            kwetupizza_send_whatsapp_message($from, "Please select a valid category (1-4).");
+            $message = empty($first_name) ? 
+                "Please select a valid category (1-4)." : 
+                "$first_name, please select a valid category (1-4).";
+            kwetupizza_send_whatsapp_message($from, $message);
             return;
         }
         
@@ -1458,7 +1483,10 @@ if (!function_exists('kwetupizza_handle_category_selection')) {
         ));
         
         if (empty($products)) {
-            kwetupizza_send_whatsapp_message($from, "Sorry, no products found in this category. Please select another category.");
+            $message = empty($first_name) ?
+                "Sorry, no products found in this category. Please select another category." :
+                "Sorry $first_name, no products found in this category. Please select another category.";
+            kwetupizza_send_whatsapp_message($from, $message);
             kwetupizza_send_menu_categories($from);
             return;
         }
@@ -1466,6 +1494,12 @@ if (!function_exists('kwetupizza_handle_category_selection')) {
         // Format the category menu with emojis
         $emoji = ['Pizza' => '🍕', 'Drinks' => '🥤', 'Dessert' => '🍰', 'Special' => '🎁'][$category];
         $message = "$emoji *{$category} Menu* $emoji\n\n";
+        
+        // Add personalized greeting if first name is available
+        if (!empty($first_name)) {
+            $message .= "Here you go, $first_name! ";
+        }
+        
         $message .= "Please type the number of the item you'd like to order:\n\n";
         
         foreach ($products as $index => $product) {
@@ -1476,8 +1510,9 @@ if (!function_exists('kwetupizza_handle_category_selection')) {
         
         kwetupizza_send_whatsapp_message($from, $message);
         
-        // Set context to await menu selection
-        kwetupizza_set_conversation_context($from, ['awaiting' => 'menu_selection']);
+        // Set context to await menu selection while preserving user info
+        $updated_context = array_merge($context, ['awaiting' => 'menu_selection']);
+        kwetupizza_set_conversation_context($from, $updated_context);
     }
 }
 
@@ -4215,6 +4250,9 @@ if (!function_exists('kwetupizza_handle_payment_provider')) {
         $context = kwetupizza_get_conversation_context($from);
         $message = strtolower(trim($message));
         
+        // Get first name if available
+        $first_name = isset($context['first_name']) ? $context['first_name'] : '';
+        
         if ($message === '1' || strpos($message, 'mobile') !== false || strpos($message, 'flutterwave') !== false) {
             // Mobile Money via Flutterwave
             kwetupizza_handle_payment_provider_flutterwave($from, $context);
@@ -4223,10 +4261,20 @@ if (!function_exists('kwetupizza_handle_payment_provider')) {
             kwetupizza_handle_payment_provider_paypal($from, $context);
         } else {
             // Invalid selection
-            $message = "🤔 I didn't understand your payment choice. Please select one of the following:\n";
+            if (!empty($first_name)) {
+                $message = "🤔 I didn't understand your payment choice, {$first_name}. Please select one of the following:\n";
+            } else {
+                $message = "🤔 I didn't understand your payment choice. Please select one of the following:\n";
+            }
+            
             $message .= "1. Mobile Money (Tanzania)\n";
             $message .= "2. PayPal / Credit Card\n\n";
-            $message .= "Simply type the number or name of your preferred payment method.";
+            
+            if (!empty($first_name)) {
+                $message .= "{$first_name}, simply type the number or name of your preferred payment method.";
+            } else {
+                $message .= "Simply type the number or name of your preferred payment method.";
+            }
             
             kwetupizza_send_whatsapp_message($from, $message);
         }
@@ -4266,17 +4314,30 @@ if (!function_exists('kwetupizza_finalize_order')) {
         $summary .= "\n*Total: " . kwetupizza_format_currency($total) . "*\n\n";
         $summary .= "*Delivery to:*\n{$context['delivery_address']}\n\n";
         
-        // Ask for payment method
-        $message = "🍕 Great! We have everything we need to place your order.\n\n";
+        // Get user's first name if available in context
+        $first_name = isset($context['first_name']) ? $context['first_name'] : '';
+        
+        // Ask for payment method with personalization if name is available
+        if (!empty($first_name)) {
+            $message = "🍕 Great job, {$first_name}! We have everything we need to place your order.\n\n";
+        } else {
+            $message = "🍕 Great! We have everything we need to place your order.\n\n";
+        }
+        
         $message .= $summary;
         $message .= "Please select your payment method:\n\n";
         $message .= "1. Mobile Money (Tanzania)\n";
         $message .= "2. PayPal / Credit Card\n\n";
-        $message .= "Simply type the number or name of your preferred payment method.";
+        
+        if (!empty($first_name)) {
+            $message .= "{$first_name}, simply type the number or name of your preferred payment method.";
+        } else {
+            $message .= "Simply type the number or name of your preferred payment method.";
+        }
         
         kwetupizza_send_whatsapp_message($from, $message);
         
-        // Update the context to await payment provider choice
+        // Update the context to await payment provider choice while preserving user info
         kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'payment_provider']));
     }
 }
