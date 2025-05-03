@@ -82,7 +82,7 @@ function kwetupizza_render_order_management() {
             }
         }
         
-        @media (max-width: 767px) {
+        @media (max-width: 1000px) {
             .col-md-9, .col-md-3 {
                 width: 100%;
             }
@@ -90,6 +90,13 @@ function kwetupizza_render_order_management() {
             .card-stats {
                 margin-top: 1rem;
             }
+        }
+        
+        /* Set Recent Orders card width to 900px */
+        .col-md-9 {
+            width: 900px;
+            max-width: 100%;
+            flex: 0 0 auto;
         }
         
         /* Button sizing for quick actions */
@@ -121,7 +128,7 @@ function kwetupizza_render_order_management() {
             
             <div class="row mb-4">
                 <div class="col-md-9">
-                    <div class="card shadow-sm">
+                    <div class="card shadow-sm" style="width: 900px; max-width: 100%;">
                         <div class="card-header bg-white d-flex justify-content-between align-items-center">
                             <h5 class="mb-0">Recent Orders</h5>
                             <div>
