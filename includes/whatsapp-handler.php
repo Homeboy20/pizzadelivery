@@ -102,50 +102,52 @@ if (function_exists($original_handler)) {
      * @param array $webhook_data Raw webhook data
      * @return mixed Response from original handler
      */
-    function kwetupizza_enhanced_whatsapp_handler($from, $message, $webhook_data = null) {
-        // Check for interactive responses
-        if ($webhook_data && function_exists('kwetupizza_process_interactive_response')) {
-            $interactive = kwetupizza_process_interactive_response($webhook_data);
-            
-            if ($interactive) {
-                // Get context to determine what we're waiting for
-                $context = kwetupizza_get_conversation_context($from);
-                $awaiting = isset($context['awaiting']) ? $context['awaiting'] : '';
+    if (!function_exists('kwetupizza_enhanced_whatsapp_handler')) {
+        function kwetupizza_enhanced_whatsapp_handler($from, $message, $webhook_data = null) {
+            // Check for interactive responses
+            if ($webhook_data && function_exists('kwetupizza_process_interactive_response')) {
+                $interactive = kwetupizza_process_interactive_response($webhook_data);
                 
-                // Handle different interactive responses based on context
-                switch ($awaiting) {
-                    case 'add_or_checkout':
-                        if ($interactive['id'] === 'add' || $interactive['id'] === 'checkout') {
-                            return kwetupizza_handle_add_or_checkout($from, $interactive['id']);
-                        }
-                        break;
-                        
-                    case 'delivery_zone':
-                        if (strpos($interactive['id'], 'zone_') === 0) {
-                            $zone_id = substr($interactive['id'], 5);
-                            return kwetupizza_handle_delivery_zone_selection($from, $zone_id);
-                        }
-                        break;
-                        
-                    case 'payment_provider':
-                        if (strpos($interactive['id'], 'payment_') === 0) {
-                            $provider = substr($interactive['id'], 8);
-                            return kwetupizza_handle_payment_provider_response($from, $provider);
-                        }
-                        break;
-                        
-                    case 'use_whatsapp_number':
-                        if ($interactive['id'] === 'yes' || $interactive['id'] === 'no') {
-                            return kwetupizza_handle_use_whatsapp_number_response($from, $interactive['id']);
-                        }
-                        break;
+                if ($interactive) {
+                    // Get context to determine what we're waiting for
+                    $context = kwetupizza_get_conversation_context($from);
+                    $awaiting = isset($context['awaiting']) ? $context['awaiting'] : '';
+                    
+                    // Handle different interactive responses based on context
+                    switch ($awaiting) {
+                        case 'add_or_checkout':
+                            if ($interactive['id'] === 'add' || $interactive['id'] === 'checkout') {
+                                return kwetupizza_handle_add_or_checkout($from, $interactive['id']);
+                            }
+                            break;
+                            
+                        case 'delivery_zone':
+                            if (strpos($interactive['id'], 'zone_') === 0) {
+                                $zone_id = substr($interactive['id'], 5);
+                                return kwetupizza_handle_delivery_zone_selection($from, $zone_id);
+                            }
+                            break;
+                            
+                        case 'payment_provider':
+                            if (strpos($interactive['id'], 'payment_') === 0) {
+                                $provider = substr($interactive['id'], 8);
+                                return kwetupizza_handle_payment_provider_response($from, $provider);
+                            }
+                            break;
+                            
+                        case 'use_whatsapp_number':
+                            if ($interactive['id'] === 'yes' || $interactive['id'] === 'no') {
+                                return kwetupizza_handle_use_whatsapp_number_response($from, $interactive['id']);
+                            }
+                            break;
+                    }
                 }
             }
+            
+            // If not interactive or not handled above, proceed with regular text handling
+            $original_handler = 'kwetupizza_handle_whatsapp_message';
+            return $original_handler($from, $message);
         }
-        
-        // If not interactive or not handled above, proceed with regular text handling
-        $original_handler = 'kwetupizza_handle_whatsapp_message';
-        return $original_handler($from, $message);
     }
 }
 
@@ -155,26 +157,28 @@ if (function_exists('add_action')) {
      * Register the enhanced WhatsApp webhook handler
      * This replaces the standard handler with one that supports interactive elements
      */
-    function kwetupizza_register_enhanced_whatsapp_handler() {
-        add_action('rest_api_init', function() {
-            // Remove the existing handler if registered
-            if (function_exists('rest_get_route_data')) {
-                $existing_route = rest_get_route_data('/kwetupizza/v1/whatsapp-webhook');
-                if ($existing_route) {
-                    global $wp_rest_server;
-                    if ($wp_rest_server && method_exists($wp_rest_server, 'unregister_route')) {
-                        $wp_rest_server->unregister_route('/kwetupizza/v1/whatsapp-webhook');
+    if (!function_exists('kwetupizza_register_enhanced_whatsapp_handler')) {
+        function kwetupizza_register_enhanced_whatsapp_handler() {
+            add_action('rest_api_init', function() {
+                // Remove the existing handler if registered
+                if (function_exists('rest_get_route_data')) {
+                    $existing_route = rest_get_route_data('/kwetupizza/v1/whatsapp-webhook');
+                    if ($existing_route) {
+                        global $wp_rest_server;
+                        if ($wp_rest_server && method_exists($wp_rest_server, 'unregister_route')) {
+                            $wp_rest_server->unregister_route('/kwetupizza/v1/whatsapp-webhook');
+                        }
                     }
                 }
-            }
-            
-            // Register our enhanced handler
-            register_rest_route('kwetupizza/v1', '/whatsapp-webhook', [
-                'methods' => 'POST',
-                'callback' => 'kwetupizza_handle_enhanced_whatsapp_webhook',
-                'permission_callback' => '__return_true'
-            ]);
-        });
+                
+                // Register our enhanced handler
+                register_rest_route('kwetupizza/v1', '/whatsapp-webhook', [
+                    'methods' => 'POST',
+                    'callback' => 'kwetupizza_handle_enhanced_whatsapp_webhook',
+                    'permission_callback' => '__return_true'
+                ]);
+            });
+        }
     }
 
     /**
@@ -183,50 +187,52 @@ if (function_exists('add_action')) {
      * @param WP_REST_Request $request The webhook request
      * @return WP_REST_Response The response
      */
-    function kwetupizza_handle_enhanced_whatsapp_webhook($request) {
-        $data = $request->get_json_params();
-        $response = new WP_REST_Response();
-        
-        // Log the incoming webhook for debugging
-        kwetupizza_log(print_r($data, true), 'debug', 'whatsapp-webhook.log');
-        
-        // Process message
-        if (isset($data['entry'][0]['changes'][0]['value']['messages'][0])) {
-            $message_data = $data['entry'][0]['changes'][0]['value']['messages'][0];
-            $from = $message_data['from'];
+    if (!function_exists('kwetupizza_handle_enhanced_whatsapp_webhook')) {
+        function kwetupizza_handle_enhanced_whatsapp_webhook($request) {
+            $data = $request->get_json_params();
+            $response = new WP_REST_Response();
             
-            // Check if this is an interactive message
-            if (isset($message_data['interactive'])) {
-                $interactive_data = null;
+            // Log the incoming webhook for debugging
+            kwetupizza_log(print_r($data, true), 'debug', 'whatsapp-webhook.log');
+            
+            // Process message
+            if (isset($data['entry'][0]['changes'][0]['value']['messages'][0])) {
+                $message_data = $data['entry'][0]['changes'][0]['value']['messages'][0];
+                $from = $message_data['from'];
                 
-                if (isset($message_data['interactive']['button_reply'])) {
-                    $button_id = $message_data['interactive']['button_reply']['id'];
-                    $text = $message_data['interactive']['button_reply']['title'];
-                    kwetupizza_log("Interactive button response received: $button_id ($text)", 'info', 'whatsapp.log');
+                // Check if this is an interactive message
+                if (isset($message_data['interactive'])) {
+                    $interactive_data = null;
                     
-                    // Process the button using enhanced handler
-                    kwetupizza_enhanced_whatsapp_handler($from, $text, $data);
+                    if (isset($message_data['interactive']['button_reply'])) {
+                        $button_id = $message_data['interactive']['button_reply']['id'];
+                        $text = $message_data['interactive']['button_reply']['title'];
+                        kwetupizza_log("Interactive button response received: $button_id ($text)", 'info', 'whatsapp.log');
+                        
+                        // Process the button using enhanced handler
+                        kwetupizza_enhanced_whatsapp_handler($from, $text, $data);
+                    }
+                    elseif (isset($message_data['interactive']['list_reply'])) {
+                        $list_id = $message_data['interactive']['list_reply']['id'];
+                        $text = $message_data['interactive']['list_reply']['title'];
+                        kwetupizza_log("Interactive list response received: $list_id ($text)", 'info', 'whatsapp.log');
+                        
+                        // Process the list selection using enhanced handler
+                        kwetupizza_enhanced_whatsapp_handler($from, $text, $data);
+                    }
                 }
-                elseif (isset($message_data['interactive']['list_reply'])) {
-                    $list_id = $message_data['interactive']['list_reply']['id'];
-                    $text = $message_data['interactive']['list_reply']['title'];
-                    kwetupizza_log("Interactive list response received: $list_id ($text)", 'info', 'whatsapp.log');
+                else if (isset($message_data['text']['body'])) {
+                    $message = $message_data['text']['body'];
                     
-                    // Process the list selection using enhanced handler
-                    kwetupizza_enhanced_whatsapp_handler($from, $text, $data);
+                    // Handle with regular handler
+                    kwetupizza_handle_whatsapp_message($from, $message);
                 }
             }
-            else if (isset($message_data['text']['body'])) {
-                $message = $message_data['text']['body'];
-                
-                // Handle with regular handler
-                kwetupizza_handle_whatsapp_message($from, $message);
-            }
+            
+            // Always return 200 OK for WhatsApp webhooks
+            $response->set_status(200);
+            return $response;
         }
-        
-        // Always return 200 OK for WhatsApp webhooks
-        $response->set_status(200);
-        return $response;
     }
 
     // Register our enhanced handler
