@@ -42,35 +42,37 @@ if (file_exists(dirname(__FILE__) . '/functions.php')) {
  * @param array $data The webhook data
  * @return array|null Extracted interaction data or null
  */
-function kwetupizza_process_interactive_response($data) {
-    if (!isset($data['entry'][0]['changes'][0]['value']['messages'][0]['interactive'])) {
+if (!function_exists('kwetupizza_process_interactive_response')) {
+    function kwetupizza_process_interactive_response($data) {
+        if (!isset($data['entry'][0]['changes'][0]['value']['messages'][0]['interactive'])) {
+            return null;
+        }
+        
+        $interactive = $data['entry'][0]['changes'][0]['value']['messages'][0]['interactive'];
+        $type = null;
+        $response_id = null;
+        $response_text = null;
+        
+        if (isset($interactive['button_reply'])) {
+            $type = 'button';
+            $response_id = $interactive['button_reply']['id'];
+            $response_text = $interactive['button_reply']['title'];
+        } elseif (isset($interactive['list_reply'])) {
+            $type = 'list';
+            $response_id = $interactive['list_reply']['id'];
+            $response_text = $interactive['list_reply']['title'];
+        }
+        
+        if ($type && $response_id) {
+            return [
+                'type' => $type,
+                'id' => $response_id,
+                'text' => $response_text
+            ];
+        }
+        
         return null;
     }
-    
-    $interactive = $data['entry'][0]['changes'][0]['value']['messages'][0]['interactive'];
-    $type = null;
-    $response_id = null;
-    $response_text = null;
-    
-    if (isset($interactive['button_reply'])) {
-        $type = 'button';
-        $response_id = $interactive['button_reply']['id'];
-        $response_text = $interactive['button_reply']['title'];
-    } elseif (isset($interactive['list_reply'])) {
-        $type = 'list';
-        $response_id = $interactive['list_reply']['id'];
-        $response_text = $interactive['list_reply']['title'];
-    }
-    
-    if ($type && $response_id) {
-        return [
-            'type' => $type,
-            'id' => $response_id,
-            'text' => $response_text
-        ];
-    }
-    
-    return null;
 }
 
 /**
