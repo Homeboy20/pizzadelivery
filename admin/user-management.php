@@ -4,12 +4,15 @@ function kwetupizza_render_user_management() {
     global $wpdb;
     $users_table = $wpdb->prefix . 'kwetupizza_users';
 
-    // Fetch all users
-    $users = $wpdb->get_results("SELECT * FROM $users_table ORDER BY role ASC");
+    // Fetch all users with better ordering that displays newest users first
+    $users = $wpdb->get_results("SELECT * FROM $users_table ORDER BY created_at DESC, role ASC");
 
     ?>
     <div class="wrap">
         <h1>User Management</h1>
+        <div class="notice notice-info">
+            <p><strong>Note:</strong> This page displays all users in the system, including those who registered through WhatsApp. Users are ordered with newest first.</p>
+        </div>
         <button class="button button-primary add-user">Add New User</button>
         <table class="wp-list-table widefat fixed striped table-view-list posts">
             <thead>
@@ -18,7 +21,9 @@ function kwetupizza_render_user_management() {
                     <th>Name</th>
                     <th>Email</th>
                     <th>Phone</th>
+                    <th>Location</th>
                     <th>Role</th>
+                    <th>Registration Date</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -30,7 +35,9 @@ function kwetupizza_render_user_management() {
                             <td><?php echo esc_html($user->name); ?></td>
                             <td><?php echo esc_html($user->email); ?></td>
                             <td><?php echo esc_html($user->phone); ?></td>
+                            <td><?php echo esc_html($user->location); ?></td>
                             <td><?php echo esc_html(ucfirst($user->role)); ?></td>
+                            <td><?php echo !empty($user->created_at) ? date('Y-m-d H:i', strtotime($user->created_at)) : 'N/A'; ?></td>
                             <td>
                                 <button class="button button-secondary edit-user" data-id="<?php echo esc_attr($user->id); ?>">Edit</button>
                                 <button class="button button-danger delete-user" data-id="<?php echo esc_attr($user->id); ?>">Delete</button>
@@ -39,7 +46,7 @@ function kwetupizza_render_user_management() {
                     <?php endforeach; ?>
                 <?php else: ?>
                     <tr>
-                        <td colspan="6">No users found.</td>
+                        <td colspan="8">No users found.</td>
                     </tr>
                 <?php endif; ?>
             </tbody>
@@ -59,6 +66,8 @@ function kwetupizza_render_user_management() {
                     <input type="email" name="email" id="email" required><br>
                     <label for="phone">Phone:</label>
                     <input type="text" name="phone" id="phone" required><br>
+                    <label for="location">Location:</label>
+                    <input type="text" name="location" id="location"><br>
                     <label for="role">Role:</label>
                     <select name="role" id="role">
                         <option value="customer">Customer</option>
@@ -158,6 +167,7 @@ function kwetupizza_render_user_management() {
                             $('#name').val(user.name);
                             $('#email').val(user.email);
                             $('#phone').val(user.phone);
+                            $('#location').val(user.location);
                             $('#role').val(user.role);
                             $('#modal-title').text('Edit User');
                             $('#user-modal').fadeIn(); // Show the modal
@@ -237,6 +247,7 @@ function kwetupizza_save_user() {
     $name = sanitize_text_field($_POST['name']);
     $email = sanitize_email($_POST['email']);
     $phone = sanitize_text_field($_POST['phone']);
+    $location = sanitize_text_field($_POST['location']);
     $role = sanitize_text_field($_POST['role']);
 
     if (empty($name) || empty($email) || empty($phone)) {
@@ -264,7 +275,9 @@ function kwetupizza_save_user() {
                 'name' => $name,
                 'email' => $email,
                 'phone' => $phone,
-                'role' => $role
+                'location' => $location,
+                'role' => $role,
+                'updated_at' => current_time('mysql')
             ),
             array('id' => $user_id)
         );
@@ -282,7 +295,10 @@ function kwetupizza_save_user() {
                 'name' => $name,
                 'email' => $email,
                 'phone' => $phone,
-                'role' => $role
+                'location' => $location,
+                'role' => $role,
+                'created_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql')
             )
         );
 

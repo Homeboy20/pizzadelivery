@@ -2684,7 +2684,14 @@ if (!function_exists('kwetupizza_get_conversation_context')) {
  */
 if (!function_exists('kwetupizza_set_conversation_context')) {
     function kwetupizza_set_conversation_context($from, $context) {
-        set_transient("kwetupizza_whatsapp_context_$from", $context, 60 * 60 * 24); // 24 hours expiry
+        // Set context with 5 minutes expiry for auto-reset chat feature
+        set_transient("kwetupizza_whatsapp_context_$from", $context, 60 * 5); // 5 minutes expiry
+        
+        // Also update the last activity timestamp
+        $context['last_activity'] = time();
+        
+        // Log the context change for debugging
+        kwetupizza_log("Set context for $from: " . print_r($context, true), 'debug', 'context.log');
     }
 }
 
