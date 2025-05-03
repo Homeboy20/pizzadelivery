@@ -334,6 +334,28 @@ function kwetupizza_log($message, $type = 'info', $file = 'kwetupizza-debug.log'
 }
 
 /**
+ * Check if a message is a greeting
+ */
+if (!function_exists('kwetupizza_is_greeting')) {
+    function kwetupizza_is_greeting($message) {
+        $message = strtolower(trim($message));
+        $greetings = array(
+            'hi', 'hello', 'hey', 'hola', 'howdy', 'good morning', 'good afternoon', 
+            'good evening', 'morning', 'afternoon', 'evening', 'whats up', "what's up",
+            'yo', 'greetings', 'sup', 'salaam', 'salam', 'jambo', 'habari', 'mambo'
+        );
+        
+        foreach ($greetings as $greeting) {
+            if (strpos($message, $greeting) !== false || $message === $greeting) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+}
+
+/**
  * Add security headers
  */
 if (!function_exists('kwetupizza_add_security_headers')) {
@@ -363,86 +385,65 @@ add_action('send_headers', 'kwetupizza_add_security_headers');
 /**
  * Send WhatsApp message
  */
+if (!function_exists('kwetupizza_send_whatsapp_message')) {
 function kwetupizza_send_whatsapp_message($phone, $message) {
-    // Log the attempt for debugging
-    kwetupizza_log("Attempting to send WhatsApp message to $phone", 'info', 'whatsapp.log');
+    // Log the message
+    kwetupizza_log('Sending WhatsApp message to: ' . $phone . ' - Message: ' . $message, 'info', 'whatsapp-webhook.log');
     
-    $token = get_option('kwetupizza_whatsapp_token');
-    $phone_id = get_option('kwetupizza_whatsapp_phone_id');
-    
-    // Log configuration for troubleshooting
-    kwetupizza_log("WhatsApp configuration - Phone ID: $phone_id, Token exists: " . (!empty($token) ? 'Yes' : 'No'), 'info', 'whatsapp.log');
-    
-    if (empty($token) || empty($phone_id)) {
-        kwetupizza_log('WhatsApp API credentials not set or incomplete', 'error', 'whatsapp.log');
-        return false;
-    }
-    
-    // Sanitize phone number with enhanced validation
+    // Format the phone number properly
     $phone = kwetupizza_sanitize_phone($phone);
     
-    // Log the sanitized phone number
-    kwetupizza_log("Sanitized phone number: $phone", 'info', 'whatsapp.log');
+    // Get the API endpoint from settings
+    $api_url = get_option('kwetupizza_whatsapp_api_url', 'https://api.whatsapp.com/v1/messages');
     
-    // Ensure the phone number starts with country code and has no leading '+'
-    if (substr($phone, 0, 1) === '+') {
-        $phone = substr($phone, 1);
-        kwetupizza_log("Removed leading + from phone number: $phone", 'info', 'whatsapp.log');
-    }
-    
-    // WhatsApp Cloud API endpoint
-    $url = "https://graph.facebook.com/v17.0/{$phone_id}/messages";
-    kwetupizza_log("Using WhatsApp endpoint: $url", 'info', 'whatsapp.log');
-
-    // Setup the request payload
+    // Create the data to send
     $data = array(
         'messaging_product' => 'whatsapp',
         'recipient_type' => 'individual',
         'to' => $phone,
         'type' => 'text',
         'text' => array(
-            'preview_url' => false,
             'body' => $message
         )
     );
     
-    // Log the payload for debugging
-    kwetupizza_log("WhatsApp payload: " . json_encode($data), 'info', 'whatsapp.log');
+    // Get the authentication token from settings
+    $auth_token = get_option('kwetupizza_whatsapp_auth_token', '');
+    
+    // Set up the request
+    $args = array(
+        'body' => json_encode($data),
+        'timeout' => 45,
+        'headers' => array(
+            'Content-Type' => 'application/json',
+            'Authorization' => 'Bearer ' . $auth_token
+        )
+    );
     
     // Send the request
-    $response = wp_remote_post($url, array(
-        'headers' => array(
-            'Authorization' => 'Bearer ' . $token,
-            'Content-Type' => 'application/json'
-        ),
-        'body' => json_encode($data),
-        'timeout' => 30
-    ));
-
+    $response = wp_remote_post($api_url, $args);
+    
     // Check for errors
     if (is_wp_error($response)) {
         $error_message = $response->get_error_message();
-        kwetupizza_log("WhatsApp API Error: $error_message", 'error', 'whatsapp.log');
-        error_log("WhatsApp API Error: $error_message");
+        kwetupizza_log('WhatsApp API error: ' . $error_message, 'error', 'whatsapp-webhook.log');
         return false;
     }
     
-    $status_code = wp_remote_retrieve_response_code($response);
-    $body = json_decode(wp_remote_retrieve_body($response), true);
+    // Get the response body
+    $response_body = wp_remote_retrieve_body($response);
+    $response_data = json_decode($response_body, true);
     
-    // Log the response for debugging
-    kwetupizza_log("WhatsApp API Response Code: $status_code", 'info', 'whatsapp.log');
-    kwetupizza_log("WhatsApp API Response: " . print_r($body, true), 'info', 'whatsapp.log');
+    // Log the response
+    kwetupizza_log('WhatsApp API response: ' . $response_body, 'info', 'whatsapp-webhook.log');
     
-    // Check for successful response
-    if (isset($body['messages']) && !empty($body['messages'])) {
-        kwetupizza_log("WhatsApp message sent successfully to $phone", 'info', 'whatsapp.log');
-        return true;
-    } else {
-        $error_detail = isset($body['error']['message']) ? $body['error']['message'] : 'Unknown error';
-        kwetupizza_log("WhatsApp message failed: $error_detail", 'error', 'whatsapp.log');
-        return false;
+    // Check if the message was sent successfully
+    if (isset($response_data['messages']) && !empty($response_data['messages'][0]['id'])) {
+        return $response_data['messages'][0]['id'];
     }
+    
+    return false;
+}
 }
 
 /**
@@ -537,134 +538,163 @@ function kwetupizza_send_nextsms($phone, $message) {
 /**
  * Notify admin about new orders or payment status
  */
+if (!function_exists('kwetupizza_notify_admin')) {
 function kwetupizza_notify_admin($order_id, $success = true) {
-    kwetupizza_log("Starting admin notification for order #$order_id", 'info', 'admin-notification.log');
-    
     global $wpdb;
     $orders_table = $wpdb->prefix . 'kwetupizza_orders';
     $order_items_table = $wpdb->prefix . 'kwetupizza_order_items';
+    $products_table = $wpdb->prefix . 'kwetupizza_products';
+    $transactions_table = $wpdb->prefix . 'kwetupizza_transactions';
     
-    $order = $wpdb->get_row($wpdb->prepare("SELECT * FROM $orders_table WHERE id = %d", $order_id));
-    
-    if (!$order) {
-        kwetupizza_log("Failed to find order #$order_id for admin notification", 'error', 'admin-notification.log');
-        return false;
-    }
-    
-    // Get order items
-    $order_items = $wpdb->get_results($wpdb->prepare(
-        "SELECT oi.*, p.product_name 
-        FROM $order_items_table oi 
-        JOIN {$wpdb->prefix}kwetupizza_products p ON oi.product_id = p.id 
-        WHERE oi.order_id = %d", 
+    // Get order details
+    $order = $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM $orders_table WHERE id = %d",
         $order_id
     ));
     
-    $admin_phone = get_option('kwetupizza_admin_whatsapp');
-    kwetupizza_log("Admin WhatsApp number from settings: $admin_phone", 'info', 'admin-notification.log');
-    
-    $status = $success ? 'successful' : 'failed';
-    
-    $message = $success ? "✅ PAYMENT CONFIRMED" : "❌ PAYMENT FAILED";
-    $message .= "\n\n🍕 *Order #$order_id*\n";
-    $message .= "👤 *Customer:* {$order->customer_name}\n";
-    $message .= "📞 *Phone:* {$order->customer_phone}\n";
-    $message .= "🏠 *Address:* {$order->delivery_address}\n";
-    
-    // Add order items
-    $message .= "\n📋 *Order Details:*\n";
-    if ($order_items) {
-        foreach ($order_items as $item) {
-            $message .= "• {$item->quantity}x {$item->product_name}\n";
-        }
+    if (!$order) {
+        return false;
     }
     
-    $message .= "\n💰 *Total:* " . kwetupizza_format_currency($order->total, $order->currency) . "\n";
-    $message .= "💳 *Payment:* $status\n";
-    $message .= "⏱️ *Time:* " . date('Y-m-d H:i:s');
+    // Get transaction details
+    $transaction = $wpdb->get_row($wpdb->prepare(
+        "SELECT * FROM $transactions_table WHERE order_id = %d ORDER BY id DESC LIMIT 1",
+        $order_id
+    ));
     
-    // Log message content for debugging
-    kwetupizza_log("Prepared admin WhatsApp notification message: " . substr($message, 0, 100) . "...", 'info', 'admin-notification.log');
+    // Get order items
+    $items = $wpdb->get_results($wpdb->prepare(
+        "SELECT oi.*, p.product_name 
+        FROM $order_items_table oi
+        JOIN $products_table p ON oi.product_id = p.id
+        WHERE oi.order_id = %d",
+        $order_id
+    ));
     
-    $whatsapp_sent = false;
-    if (!empty($admin_phone)) {
-        kwetupizza_log("Attempting to send WhatsApp notification to admin at $admin_phone", 'info', 'admin-notification.log');
-        $whatsapp_sent = kwetupizza_send_whatsapp_message($admin_phone, $message);
-        if ($whatsapp_sent) {
-            kwetupizza_log("Successfully sent WhatsApp notification to admin", 'info', 'admin-notification.log');
-        } else {
-            kwetupizza_log("Failed to send WhatsApp notification to admin", 'error', 'admin-notification.log');
-        }
-    } else {
-        kwetupizza_log("No admin WhatsApp number configured, skipping WhatsApp notification", 'warning', 'admin-notification.log');
+    // Get admin email
+    $admin_email = get_option('admin_email');
+    
+    // Build the email message
+    $subject = $success ? 'New Order Payment Received - Order #' . $order_id : 'Failed Payment Attempt - Order #' . $order_id;
+    
+    $message = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">';
+    $message .= '<h2 style="color: #e74c3c;">' . ($success ? 'New Order Payment Received' : 'Failed Payment Attempt') . '</h2>';
+    $message .= '<p><strong>Order #:</strong> ' . $order_id . '</p>';
+    $message .= '<p><strong>Date:</strong> ' . date('Y-m-d H:i:s') . '</p>';
+    $message .= '<p><strong>Customer:</strong> ' . $order->customer_name . '</p>';
+    $message .= '<p><strong>Phone:</strong> ' . $order->customer_phone . '</p>';
+    $message .= '<p><strong>Email:</strong> ' . $order->customer_email . '</p>';
+    $message .= '<p><strong>Delivery Address:</strong> ' . $order->delivery_address . '</p>';
+    
+    if ($transaction) {
+        $message .= '<p><strong>Payment Method:</strong> ' . $transaction->payment_method . '</p>';
+        $message .= '<p><strong>Transaction Reference:</strong> ' . $transaction->transaction_reference . '</p>';
     }
     
-    $admin_sms = get_option('kwetupizza_admin_sms');
-    $sms_sent = false;
-    if (!empty($admin_sms)) {
-        // Simplified message for SMS due to length constraints
-        $sms_message = "Order #$order_id: {$order->customer_name}, {$order->customer_phone}, " . 
-                       kwetupizza_format_currency($order->total, $order->currency) . ". Payment: $status";
-        kwetupizza_log("Attempting to send SMS notification to admin at $admin_sms", 'info', 'admin-notification.log');
-        $sms_sent = kwetupizza_send_nextsms($admin_sms, $sms_message);
-        if ($sms_sent) {
-            kwetupizza_log("Successfully sent SMS notification to admin", 'info', 'admin-notification.log');
-        } else {
-            kwetupizza_log("Failed to send SMS notification to admin", 'error', 'admin-notification.log');
-        }
-    } else {
-        kwetupizza_log("No admin SMS number configured, skipping SMS notification", 'warning', 'admin-notification.log');
+    $message .= '<table style="width: 100%; border-collapse: collapse; margin-top: 20px;">';
+    $message .= '<thead><tr style="background-color: #f4f4f4;"><th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item</th><th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Quantity</th><th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Price</th></tr></thead>';
+    $message .= '<tbody>';
+    
+    foreach ($items as $item) {
+        $message .= '<tr>';
+        $message .= '<td style="padding: 10px; border: 1px solid #ddd;">' . $item->product_name . '</td>';
+        $message .= '<td style="padding: 10px; text-align: center; border: 1px solid #ddd;">' . $item->quantity . '</td>';
+        $message .= '<td style="padding: 10px; text-align: right; border: 1px solid #ddd;">' . kwetupizza_format_currency($item->price * $item->quantity) . '</td>';
+        $message .= '</tr>';
     }
     
-    kwetupizza_log("Admin notification process completed for order #$order_id", 'info', 'admin-notification.log');
-    return ($whatsapp_sent || $sms_sent); // Return true if at least one notification was sent
+    $message .= '</tbody>';
+    $message .= '<tfoot><tr style="background-color: #f9f9f9;"><td colspan="2" style="padding: 10px; text-align: right; border: 1px solid #ddd;"><strong>Total:</strong></td><td style="padding: 10px; text-align: right; border: 1px solid #ddd;"><strong>' . kwetupizza_format_currency($order->total) . '</strong></td></tr></tfoot>';
+    $message .= '</table>';
+    
+    $message .= '<div style="margin-top: 30px; padding: 15px; background-color: ' . ($success ? '#dff0d8' : '#f2dede') . '; border-radius: 4px;">';
+    $message .= '<p style="margin: 0; color: ' . ($success ? '#3c763d' : '#a94442') . ';">';
+    $message .= $success ? 'The payment for this order was successful. Please process this order.' : 'The payment for this order failed. The customer may try again later.';
+    $message .= '</p>';
+    $message .= '</div>';
+    
+    $message .= '<div style="margin-top: 30px; text-align: center;">';
+    $message .= '<a href="' . admin_url('admin.php?page=kwetupizza-orders&action=view&id=' . $order_id) . '" style="display: inline-block; padding: 10px 20px; background-color: #e74c3c; color: #fff; text-decoration: none; border-radius: 4px;">View Order Details</a>';
+    $message .= '</div>';
+    
+    $message .= '</div>';
+    
+    // Set up email headers
+    $headers = array(
+        'Content-Type: text/html; charset=UTF-8',
+        'From: ' . get_bloginfo('name') . ' <' . $admin_email . '>'
+    );
+    
+    // Send the email
+    $sent = wp_mail($admin_email, $subject, $message, $headers);
+    
+    return $sent;
+}
 }
 
 /**
  * Notify admin of new orders via WhatsApp and SMS
  */
+if (!function_exists('kwetupizza_notify_admin_of_order')) {
 function kwetupizza_notify_admin_of_order($order_id, $order_details) {
-    $admin_whatsapp = get_option('kwetupizza_admin_whatsapp');
-    $admin_sms = get_option('kwetupizza_admin_sms');
+    // Get admin email
+    $admin_email = get_option('admin_email');
     
-    if (empty($admin_whatsapp) && empty($admin_sms)) {
-        error_log('No admin notification numbers set');
-        return false;
+    // Build the email message
+    $subject = 'New Order Received - Order #' . $order_id;
+    
+    $message = '<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">';
+    $message .= '<h2 style="color: #e74c3c;">New Order Received</h2>';
+    $message .= '<p><strong>Order #:</strong> ' . $order_id . '</p>';
+    $message .= '<p><strong>Date:</strong> ' . date('Y-m-d H:i:s') . '</p>';
+    
+    // Customer information
+    $message .= '<h3>Customer Information</h3>';
+    $message .= '<p><strong>Name:</strong> ' . $order_details['customer_name'] . '</p>';
+    $message .= '<p><strong>Phone:</strong> ' . $order_details['customer_phone'] . '</p>';
+    if (!empty($order_details['customer_email'])) {
+        $message .= '<p><strong>Email:</strong> ' . $order_details['customer_email'] . '</p>';
     }
     
-    // Create notification message
-    $message = "New Order #{$order_id} Received!\n\n";
-    $message .= "Customer: {$order_details['customer_name']}\n";
-    $message .= "Phone: {$order_details['customer_phone']}\n";
-    $message .= "Amount: {$order_details['amount']} {$order_details['currency']}\n";
-    $message .= "Items: {$order_details['items']}\n";
-    $message .= "Delivery: {$order_details['delivery_address']}\n";
-    $message .= "Time: " . current_time('mysql');
+    // Delivery information
+    $message .= '<h3>Delivery Information</h3>';
+    $message .= '<p><strong>Address:</strong> ' . $order_details['delivery_address'] . '</p>';
     
-    $success = true;
+    // Order items
+    $message .= '<h3>Order Details</h3>';
+    $message .= '<table style="width: 100%; border-collapse: collapse; margin-top: 20px;">';
+    $message .= '<thead><tr style="background-color: #f4f4f4;"><th style="padding: 10px; text-align: left; border: 1px solid #ddd;">Item</th><th style="padding: 10px; text-align: center; border: 1px solid #ddd;">Quantity</th><th style="padding: 10px; text-align: right; border: 1px solid #ddd;">Price</th></tr></thead>';
+    $message .= '<tbody>';
     
-    // Send WhatsApp notification
-    if (!empty($admin_whatsapp)) {
-        $whatsapp_sent = kwetupizza_send_whatsapp_message($admin_whatsapp, $message);
-        if (!$whatsapp_sent) {
-            error_log('Failed to send WhatsApp notification to admin');
-            $success = false;
-        }
+    foreach ($order_details['items'] as $item) {
+        $message .= '<tr>';
+        $message .= '<td style="padding: 10px; border: 1px solid #ddd;">' . $item['name'] . '</td>';
+        $message .= '<td style="padding: 10px; text-align: center; border: 1px solid #ddd;">' . $item['quantity'] . '</td>';
+        $message .= '<td style="padding: 10px; text-align: right; border: 1px solid #ddd;">' . kwetupizza_format_currency($item['price'] * $item['quantity']) . '</td>';
+        $message .= '</tr>';
     }
     
-    // Send SMS notification
-    if (!empty($admin_sms)) {
-        // Create shorter SMS message for cost efficiency
-        $sms_message = "New Order #{$order_id}. Customer: {$order_details['customer_name']}. Amount: {$order_details['amount']} {$order_details['currency']}. Check dashboard.";
-        
-        $sms_sent = kwetupizza_send_nextsms($admin_sms, $sms_message);
-        if (!$sms_sent) {
-            error_log('Failed to send SMS notification to admin');
-            $success = false;
-        }
-    }
+    $message .= '</tbody>';
+    $message .= '<tfoot><tr style="background-color: #f9f9f9;"><td colspan="2" style="padding: 10px; text-align: right; border: 1px solid #ddd;"><strong>Total:</strong></td><td style="padding: 10px; text-align: right; border: 1px solid #ddd;"><strong>' . kwetupizza_format_currency($order_details['total']) . '</strong></td></tr></tfoot>';
+    $message .= '</table>';
     
-    return $success;
+    $message .= '<div style="margin-top: 30px; text-align: center;">';
+    $message .= '<a href="' . admin_url('admin.php?page=kwetupizza-orders&action=view&id=' . $order_id) . '" style="display: inline-block; padding: 10px 20px; background-color: #e74c3c; color: #fff; text-decoration: none; border-radius: 4px;">Process Order</a>';
+    $message .= '</div>';
+    
+    $message .= '</div>';
+    
+    // Set up email headers
+    $headers = array(
+        'Content-Type: text/html; charset=UTF-8',
+        'From: ' . get_bloginfo('name') . ' <' . $admin_email . '>'
+    );
+    
+    // Send the email
+    $sent = wp_mail($admin_email, $subject, $message, $headers);
+    
+    return $sent;
+}
 }
 
 /**
@@ -734,36 +764,42 @@ function kwetupizza_test_sms_ajax() {
 /**
  * Verify Flutterwave payment
  */
+if (!function_exists('kwetupizza_verify_payment')) {
 function kwetupizza_verify_payment($transaction_id) {
-    $flw_secret_key = get_option('kwetupizza_flw_secret_key');
+    // Get the secret key from settings
+    $secret_key = get_option('kwetupizza_flutterwave_secret_key', '');
     
-    if (empty($flw_secret_key)) {
-        kwetupizza_log('Flutterwave secret key not configured', 'error');
-        return false;
-    }
+    // Set up the API endpoint
+    $api_url = 'https://api.flutterwave.com/v3/transactions/' . $transaction_id . '/verify';
     
-    $url = "https://api.flutterwave.com/v3/transactions/{$transaction_id}/verify";
-    
-    $response = wp_remote_get($url, [
-        'headers' => [
+    // Set up the request
+    $args = array(
+        'timeout' => 45,
+        'headers' => array(
             'Content-Type' => 'application/json',
-            'Authorization' => 'Bearer ' . $flw_secret_key
-        ]
-    ]);
+            'Authorization' => 'Bearer ' . $secret_key
+        )
+    );
     
+    // Send the request
+    $response = wp_remote_get($api_url, $args);
+    
+    // Check for errors
     if (is_wp_error($response)) {
-        kwetupizza_log('Flutterwave verification error: ' . $response->get_error_message(), 'error');
-        return false;
+        $error_message = $response->get_error_message();
+        kwetupizza_log('Flutterwave payment verification error: ' . $error_message, 'error');
+        return array('status' => 'error', 'message' => $error_message);
     }
     
-    $body = json_decode(wp_remote_retrieve_body($response), true);
+    // Get the response body
+    $response_body = wp_remote_retrieve_body($response);
+    $response_data = json_decode($response_body, true);
     
-    if (isset($body['status']) && $body['status'] === 'success' && 
-        isset($body['data']['status']) && $body['data']['status'] === 'successful') {
-        return $body['data'];
-    }
+    // Log the response
+    kwetupizza_log('Flutterwave payment verification response: ' . $response_body, 'info');
     
-    return false;
+    return $response_data;
+}
 }
 
 /**
@@ -889,14 +925,9 @@ if (!function_exists('kwetupizza_get_customer_email')) {
         global $wpdb;
         $users_table = $wpdb->prefix . 'kwetupizza_users';
         
-        $email = $wpdb->get_var($wpdb->prepare("SELECT email FROM $users_table WHERE phone = %s", $phone));
+        $email = $wpdb->get_var($wpdb->prepare("SELECT email FROM $users_table WHERE phone = %s LIMIT 1", $phone));
         
-        if ($email) {
-            return $email;
-        }
-        
-        // Generate a placeholder email if not found
-        return 'customer_' . substr(md5($phone), 0, 8) . '@example.com';
+        return $email ? $email : '';
     }
 }
 
@@ -4236,9 +4267,9 @@ if (!function_exists('kwetupizza_is_greeting')) {
     function kwetupizza_is_greeting($message) {
         $message = strtolower(trim($message));
         $greetings = array(
-            'hi', 'hey', 'hello', 'hola', 'habari', 'jambo', 'sasa', 'mambo', 
-            'good morning', 'good afternoon', 'good evening', 
-            'start', 'begin', 'howdy', 'yo', 'hujambo', 'salaam'
+            'hi', 'hello', 'hey', 'hola', 'howdy', 'good morning', 'good afternoon', 
+            'good evening', 'morning', 'afternoon', 'evening', 'whats up', "what's up",
+            'yo', 'greetings', 'sup', 'salaam', 'salam', 'jambo', 'habari', 'mambo'
         );
         
         foreach ($greetings as $greeting) {
