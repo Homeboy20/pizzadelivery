@@ -199,4 +199,16 @@ function kwetupizza_get_customer_loyalty(WP_REST_Request $request) {
         
         return new WP_REST_Response($data, 200);
                 }
-} 
+}
+
+/**
+ * Register Enhanced WhatsApp Webhook
+ */
+function kwetupizza_register_enhanced_whatsapp_webhook() {
+    register_rest_route('kwetupizza/v1', '/enhanced-whatsapp-webhook', array(
+        'methods' => 'POST',
+        'callback' => 'kwetupizza_handle_enhanced_whatsapp_webhook',
+        'permission_callback' => '__return_true'
+    ));
+}
+add_action('rest_api_init', 'kwetupizza_register_enhanced_whatsapp_webhook'); 

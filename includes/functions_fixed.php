@@ -1097,12 +1097,48 @@ if (!function_exists('kwetupizza_uninstall')) {
  * Main WhatsApp message handler
  */
 if (!function_exists('kwetupizza_handle_whatsapp_message')) {
-    function kwetupizza_handle_whatsapp_message($from, $message) {
+    function kwetupizza_handle_whatsapp_message($from, $message, $interactive_data = null) {
         // Log the context and input for debugging
         kwetupizza_log_context_and_input($from, $message);
         
         // Get current context (if any)
         $context = kwetupizza_get_conversation_context($from);
+        
+        // Process interactive data if provided
+        if ($interactive_data) {
+            // Log the interactive data
+            kwetupizza_log("Processing interactive data: " . json_encode($interactive_data), 'info', 'whatsapp.log');
+            
+            if ($interactive_data['type'] === 'button') {
+                // Process button response
+                $button_id = $interactive_data['id'];
+                
+                if ($button_id === 'add' && isset($context['awaiting']) && $context['awaiting'] === 'add_or_checkout') {
+                    // User clicked "Add More Items"
+                    kwetupizza_send_menu_categories($from);
+                    $context['awaiting'] = 'category_selection';
+                    kwetupizza_set_conversation_context($from, $context);
+                    return;
+                } elseif ($button_id === 'checkout' && isset($context['awaiting']) && $context['awaiting'] === 'add_or_checkout') {
+                    // User clicked "Proceed to Checkout"
+                    $message = 'checkout'; // Set message to be handled by regular flow
+                } elseif (($button_id === 'yes' || $button_id === 'no') && isset($context['awaiting']) && $context['awaiting'] === 'use_whatsapp_number') {
+                    // User responded to the WhatsApp number confirmation
+                    $message = $button_id; // Set message to be handled by regular flow
+                } elseif (in_array($button_id, ['vodacom', 'tigo', 'airtel', 'halopesa', 'paypal']) && isset($context['awaiting']) && $context['awaiting'] === 'payment_provider') {
+                    // User selected a payment provider
+                    $message = $button_id; // Set message to be handled by regular flow
+                }
+            } elseif ($interactive_data['type'] === 'list') {
+                // Process list response
+                $list_id = $interactive_data['id'];
+                
+                if (isset($context['awaiting']) && $context['awaiting'] === 'delivery_zone') {
+                    // User selected a delivery zone from the list
+                    $message = $list_id; // Use the ID directly for zone selection
+                }
+            }
+        }
         
         // Check if we're expecting a specific type of response
         if (!empty($context['awaiting'])) {
@@ -1145,11 +1181,17 @@ if (!function_exists('kwetupizza_handle_whatsapp_message')) {
             } else if ($awaiting === 'delivery_zone') {
                 kwetupizza_handle_delivery_zone_selection($from, $message);
                 return;
-            } else if ($awaiting === 'delivery_address') {
+            } else if ($awaiting === 'full_address') {
                 kwetupizza_handle_address_and_ask_payment_provider($from, $message);
                 return;
             } else if ($awaiting === 'payment_provider') {
                 kwetupizza_handle_payment_provider($from, $message);
+                return;
+            } else if ($awaiting === 'use_whatsapp_number') {
+                kwetupizza_handle_use_whatsapp_number_response($from, $message);
+                return;
+            } else if ($awaiting === 'payment_phone') {
+                kwetupizza_handle_payment_phone_input($from, $message);
                 return;
             } else if ($awaiting === 'order_completion') {
                 // Order is complete, just reply with a generic message
@@ -1179,13 +1221,21 @@ if (!function_exists('kwetupizza_handle_whatsapp_message')) {
         }
         
         // Check if the message is a greeting
-        if (kwetupizza_is_greeting($message)) {
-            kwetupizza_start_conversation($from);
+        if (function_exists('kwetupizza_is_greeting') && kwetupizza_is_greeting($message)) {
+            if (function_exists('kwetupizza_start_conversation')) {
+                kwetupizza_start_conversation($from);
+            } else {
+                kwetupizza_send_greeting($from);
+            }
             return;
         }
         
         // Default response for unrecognized messages
-        kwetupizza_send_default_response($from);
+        if (function_exists('kwetupizza_send_default_response')) {
+            kwetupizza_send_default_response($from);
+        } else {
+            kwetupizza_send_whatsapp_message($from, "Sorry, I didn't understand that. Type 'menu' to see available options.");
+        }
     }
 }
 
@@ -1553,10 +1603,21 @@ if (!function_exists('kwetupizza_handle_add_or_checkout')) {
                 // User information exists, proceed to delivery zone selection
                 $message = "Thank you, " . explode(' ', $user->name)[0] . "! Let's continue with your delivery information.";
                 kwetupizza_send_whatsapp_message($from, $message);
-                kwetupizza_show_delivery_zones($from);
+                
+                // Use interactive list if available
+                if (function_exists('kwetupizza_send_delivery_zones')) {
+                    kwetupizza_send_delivery_zones($from);
+                } else {
+                    kwetupizza_show_delivery_zones($from);
+                }
             }
         } else {
-            kwetupizza_send_whatsapp_message($from, "Sorry, I didn't understand that. Type 'add' to add more items or 'checkout' to proceed.");
+            // Try interactive options if available
+            if (function_exists('kwetupizza_send_checkout_options')) {
+                kwetupizza_send_checkout_options($from);
+            } else {
+                kwetupizza_send_whatsapp_message($from, "Sorry, I didn't understand that. Type 'add' to add more items or 'checkout' to proceed.");
+            }
         }
     }
 }
@@ -1694,13 +1755,41 @@ if (!function_exists('kwetupizza_handle_delivery_zone_selection')) {
         global $wpdb;
         $zones_table = $wpdb->prefix . 'kwetupizza_delivery_zones';
         
-        // Check if zone_id is valid
-        $zone = $wpdb->get_row($wpdb->prepare("SELECT * FROM $zones_table WHERE id = %d", $zone_id));
-        
-        if (!$zone) {
-            kwetupizza_send_whatsapp_message($from, "Please select a valid delivery area number.");
-            kwetupizza_show_delivery_zones($from);
-            return;
+        // Check if we received a zone name instead of ID (from interactive buttons)
+        if (!is_numeric($zone_id)) {
+            // Try to find the zone by name
+            $zone = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM $zones_table WHERE zone_name = %s", 
+                $zone_id
+            ));
+            
+            // If not found by name, display zones again
+            if (!$zone) {
+                if (function_exists('kwetupizza_send_delivery_zones')) {
+                    kwetupizza_send_delivery_zones($from);
+                } else {
+                    kwetupizza_show_delivery_zones($from);
+                }
+                return;
+            }
+            
+            $zone_id = $zone->id;
+        } else {
+            // Check if zone_id is valid
+            $zone = $wpdb->get_row($wpdb->prepare(
+                "SELECT * FROM $zones_table WHERE id = %d", 
+                $zone_id
+            ));
+            
+            if (!$zone) {
+                kwetupizza_send_whatsapp_message($from, "Please select a valid delivery area number.");
+                if (function_exists('kwetupizza_send_delivery_zones')) {
+                    kwetupizza_send_delivery_zones($from);
+                } else {
+                    kwetupizza_show_delivery_zones($from);
+                }
+                return;
+            }
         }
         
         // Save the selected zone in context
@@ -1764,21 +1853,32 @@ if (!function_exists('kwetupizza_handle_address_and_ask_payment_provider')) {
             }
             
             $summary_message .= "Delivery Address: {$address}\n\n";
-            $summary_message .= "Please select your Mobile Money network for payment:";
             
-            // Show interactive network selection buttons
-            $networks = [
-                "1" => "Vodacom (M-Pesa)",
-                "2" => "Tigo (Tigo Pesa)",
-                "3" => "Airtel (Airtel Money)",
-                "4" => "Halotel (Halopesa)"
-            ];
-            
-            foreach ($networks as $key => $network) {
-                $summary_message .= "\n{$key}. {$network}";
-            }
-            
+            // Send the order summary first
             kwetupizza_send_whatsapp_message($from, $summary_message);
+            
+            // Then ask for payment method with either interactive buttons or text
+            if (function_exists('kwetupizza_send_payment_options')) {
+                // Use interactive buttons for payment selection
+                kwetupizza_send_payment_options($from);
+            } else {
+                // Fallback to text-based selection
+                $message = "Please select your Mobile Money network for payment:";
+                
+                // Show payment options
+                $networks = [
+                    "1" => "Vodacom (M-Pesa)",
+                    "2" => "Tigo (Tigo Pesa)",
+                    "3" => "Airtel (Airtel Money)",
+                    "4" => "Halotel (Halopesa)"
+                ];
+                
+                foreach ($networks as $key => $network) {
+                    $message .= "\n{$key}. {$network}";
+                }
+                
+                kwetupizza_send_whatsapp_message($from, $message);
+            }
 
             // Set the context to expect a network provider response
             kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'payment_provider']));
@@ -1791,8 +1891,8 @@ if (!function_exists('kwetupizza_handle_address_and_ask_payment_provider')) {
 /**
  * Handle payment provider response
  */
-if (!function_exists('kwetupizza_handle_payment_provider_response')) {
-    function kwetupizza_handle_payment_provider_response($from, $provider) {
+if (!function_exists('kwetupizza_handle_payment_provider')) {
+    function kwetupizza_handle_payment_provider($from, $provider) {
         $context = kwetupizza_get_conversation_context($from);
         
         if (isset($context['awaiting']) && $context['awaiting'] === 'payment_provider') {
@@ -1835,29 +1935,48 @@ if (!function_exists('kwetupizza_handle_payment_provider_response')) {
                 
                 if ($provider_key === 'paypal') {
                     // Handle PayPal/card payment flow
-                    kwetupizza_handle_paypal_payment($from);
+                    if (function_exists('kwetupizza_handle_paypal_payment')) {
+                        kwetupizza_handle_paypal_payment($from);
+                    } else {
+                        // Fallback if PayPal handler not available
+                        kwetupizza_send_whatsapp_message($from, "Sorry, PayPal payments are not available at this time. Please choose a mobile money option.");
+                        // Show payment options again
+                        if (function_exists('kwetupizza_send_payment_options')) {
+                            kwetupizza_send_payment_options($from);
+                        }
+                    }
                 } else {
                     // Handle mobile money flow
                     // Ask if the user wants to use their WhatsApp number for payment
-                    $message = "Would you like to use your WhatsApp number ($from) for payment?\n\n";
-                    $message .= "1. Yes\n";
-                    $message .= "2. No (provide another number)";
-                    
-                    kwetupizza_send_whatsapp_message($from, $message);
+                    // Use interactive buttons if available
+                    if (function_exists('kwetupizza_send_phone_confirmation')) {
+                        kwetupizza_send_phone_confirmation($from);
+                    } else {
+                        $message = "Would you like to use your WhatsApp number ($from) for payment?\n\n";
+                        $message .= "1. Yes\n";
+                        $message .= "2. No (provide another number)";
+                        
+                        kwetupizza_send_whatsapp_message($from, $message);
+                    }
     
                     // Set the context to expect a yes/no response
                     kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'use_whatsapp_number']));
                 }
             } else {
                 // Invalid provider input
-                $message = "Please reply with a valid payment option:\n\n";
-                $message .= "1. Vodacom M-Pesa\n";
-                $message .= "2. Tigo Pesa\n";
-                $message .= "3. Airtel Money\n";
-                $message .= "4. Halo Pesa\n";
-                $message .= "5. Card Payment (PayPal)";
-                
-                kwetupizza_send_whatsapp_message($from, $message);
+                // Use interactive buttons if available
+                if (function_exists('kwetupizza_send_payment_options')) {
+                    kwetupizza_send_payment_options($from);
+                } else {
+                    $message = "Please reply with a valid payment option:\n\n";
+                    $message .= "1. Vodacom M-Pesa\n";
+                    $message .= "2. Tigo Pesa\n";
+                    $message .= "3. Airtel Money\n";
+                    $message .= "4. Halo Pesa\n";
+                    $message .= "5. Card Payment (PayPal)";
+                    
+                    kwetupizza_send_whatsapp_message($from, $message);
+                }
             }
         } else {
             // Unexpected response, send a default message
@@ -3545,4 +3664,75 @@ if (!function_exists('kwetupizza_personalize_message')) {
         
         return $message;
     }  
+}
+
+/**
+ * Enhanced WhatsApp webhook handler that supports interactive buttons
+ */
+if (!function_exists('kwetupizza_handle_enhanced_whatsapp_webhook')) {
+    function kwetupizza_handle_enhanced_whatsapp_webhook($request) {
+        $webhook_data = $request->get_json_params();
+
+        // Log the incoming data for debugging
+        kwetupizza_log("WhatsApp Webhook Data: " . json_encode($webhook_data), 'info', 'whatsapp-webhook.log');
+
+        if (isset($webhook_data['entry'][0]['changes'][0]['value']['messages'][0])) {
+            $message_data = $webhook_data['entry'][0]['changes'][0]['value']['messages'][0];
+            
+            // Check if 'from' exists before using it
+            if (isset($message_data['from'])) {
+                $from = $message_data['from'];
+                
+                // Check if it's an interactive message
+                $interactive_data = null;
+                if (isset($message_data['interactive'])) {
+                    // Process interactive message (button or list selection)
+                    if (function_exists('kwetupizza_process_interactive_response')) {
+                        $interactive_data = kwetupizza_process_interactive_response($webhook_data);
+                    } else {
+                        // Manual processing if the function isn't available
+                        if (isset($message_data['interactive']['button_reply'])) {
+                            $interactive_data = [
+                                'type' => 'button',
+                                'id' => $message_data['interactive']['button_reply']['id'],
+                                'title' => $message_data['interactive']['button_reply']['title']
+                            ];
+                        } elseif (isset($message_data['interactive']['list_reply'])) {
+                            $interactive_data = [
+                                'type' => 'list',
+                                'id' => $message_data['interactive']['list_reply']['id'],
+                                'title' => $message_data['interactive']['list_reply']['title'],
+                                'description' => isset($message_data['interactive']['list_reply']['description']) ? 
+                                    $message_data['interactive']['list_reply']['description'] : ''
+                            ];
+                        }
+                    }
+                    
+                    // Log the extracted interactive data
+                    if ($interactive_data) {
+                        kwetupizza_log("Extracted interactive data: " . json_encode($interactive_data), 'info', 'whatsapp-webhook.log');
+                        
+                        // Process with interactive data but no text
+                        kwetupizza_handle_whatsapp_message($from, '', $interactive_data);
+                        return new WP_REST_Response('Interactive message processed', 200);
+                    }
+                }
+                
+                // Check if text body exists (regular text message)
+                if (isset($message_data['text']['body'])) {
+                    $message = trim($message_data['text']['body']);
+                    kwetupizza_handle_whatsapp_message($from, $message);
+                    return new WP_REST_Response('Message processed', 200);
+                }
+            }
+        } elseif (isset($webhook_data['entry'][0]['changes'][0]['value']['statuses'][0])) {
+            kwetupizza_log('Received a message status update', 'info', 'whatsapp-webhook.log');
+            return new WP_REST_Response('Status update received', 200);
+        } else {
+            kwetupizza_log('WhatsApp message structure not as expected', 'error', 'whatsapp-webhook.log');
+            return new WP_REST_Response('No valid message or status found', 400);
+        }
+
+        return new WP_REST_Response('Invalid data received', 400);
+    }
 }
