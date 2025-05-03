@@ -75,6 +75,20 @@ if (!function_exists('kwetupizza_register_api_routes')) {
                 ),
             ),
         ));
+        
+        // PayPal success webhook
+        register_rest_route('kwetupizza/v1', '/paypal-success', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => 'kwetupizza_paypal_success_webhook',
+            'permission_callback' => '__return_true',
+        ));
+        
+        // PayPal cancel webhook
+        register_rest_route('kwetupizza/v1', '/paypal-cancel', array(
+            'methods' => WP_REST_Server::READABLE,
+            'callback' => 'kwetupizza_paypal_cancel_webhook',
+            'permission_callback' => '__return_true',
+        ));
     }
 }
 
