@@ -98,6 +98,9 @@ require_once KWETUPIZZA_PLUGIN_DIR . 'includes/api-controller.php';
 // Include shortcodes
 require_once KWETUPIZZA_PLUGIN_DIR . 'includes/shortcodes.php';
 
+// Include PayPal checkout
+include_once(plugin_dir_path(__FILE__) . 'includes/paypal-checkout.php');
+
 // Register REST API routes
 add_action('rest_api_init', 'kwetupizza_register_api_routes');
 
