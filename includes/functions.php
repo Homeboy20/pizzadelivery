@@ -1718,71 +1718,54 @@ if (!function_exists('kwetupizza_save_order_to_db')) {
         global $wpdb;
         $orders_table = $wpdb->prefix . 'kwetupizza_orders';
         $order_items_table = $wpdb->prefix . 'kwetupizza_order_items';
-        $transactions_table = $wpdb->prefix . 'kwetupizza_transactions';
         
-        // Try to get the customer name from context or use phone as default
-        $customer_name = isset($context['customer_name']) ? $context['customer_name'] : "Customer-" . substr($phone, -5);
+        // Get or create user to use their name
+        $user = kwetupizza_get_or_create_user($phone);
         
-        // Insert order
-        $wpdb->insert(
-            $orders_table,
-            [
-                'customer_name' => $customer_name,
-                'customer_phone' => $phone,
-                'customer_email' => kwetupizza_get_customer_email($phone),
-                'delivery_address' => $address,
-                'delivery_phone' => $phone,
-                'status' => 'pending_payment',
-                'total' => $total,
-                'currency' => 'TZS',
-                'created_at' => current_time('mysql'),
-                'updated_at' => current_time('mysql')
-            ]
+        // Prepare common order data
+        $order_data = array(
+            'order_date' => current_time('mysql'),
+            'customer_name' => $user->name,
+            'customer_phone' => kwetupizza_sanitize_phone($phone),
+            'customer_email' => $user->email,
+            'delivery_address' => $address,
+            'delivery_phone' => kwetupizza_sanitize_phone($phone),
+            'status' => 'pending_payment',
+            'total' => $total,
+            'currency' => 'TZS',
+            'created_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql')
         );
         
-        $order_id = $wpdb->insert_id;
+        // Insert order into database
+        $result = $wpdb->insert($orders_table, $order_data);
         
-        if (!$order_id) {
-            kwetupizza_log("Failed to create order: " . $wpdb->last_error, 'error', 'payment.log');
+        if ($result === false) {
+            kwetupizza_log("Failed to insert order into database: " . $wpdb->last_error, 'error');
             return false;
         }
         
+        $order_id = $wpdb->insert_id;
+        kwetupizza_log("Order saved with ID: $order_id", 'info');
+        
         // Insert order items
-        foreach ($cart as $item) {
-            $wpdb->insert(
-                $order_items_table,
-                [
-                    'order_id' => $order_id,
-                    'product_id' => $item['product_id'],
-                    'quantity' => $item['quantity'],
-                    'price' => $item['price'],
-                    'created_at' => current_time('mysql')
-                ]
+        foreach ($context['cart'] as $item) {
+            $item_data = array(
+                'order_id' => $order_id,
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity'],
+                'price' => $item['price'],
+                'created_at' => current_time('mysql')
             );
+            
+            $wpdb->insert($order_items_table, $item_data);
         }
         
-        // Generate unique transaction reference
-        $tx_ref = 'order-' . $order_id . '-' . time();
+        // Add order creation event to timeline
+        kwetupizza_add_order_timeline_event($order_id, 'order_created', 'Order created via WhatsApp');
         
-        // Create transaction record
-        $wpdb->insert(
-            $transactions_table,
-            [
-                'order_id' => $order_id,
-                'transaction_date' => current_time('mysql'),
-                'payment_method' => isset($context['payment_provider']) ? $context['payment_provider'] : 'Mobile Money',
-                'payment_status' => 'pending',
-                'amount' => $total,
-                'currency' => 'TZS',
-                'payment_provider' => 'Flutterwave',
-                'tx_ref' => $tx_ref,
-                'created_at' => current_time('mysql'),
-                'updated_at' => current_time('mysql')
-            ]
-        );
-        
-        // Add order to timeline
-        kwetupizza_add_order_timeline_event($order_id, 'order_placed', 'Order placed, awaiting payment');
+        // Notify admin of new order
+        kwetupizza_notify_admin($order_id);
         
         return $order_id;
     }
@@ -2350,19 +2333,35 @@ if (!function_exists('kwetupizza_notify_customer')) {
             return false;
         }
         
+        // Get user and ensure it exists in the database
+        $user = kwetupizza_get_or_create_user($order->customer_phone);
+        $name = $user->name;
+        
+        // Get first name for more casual communication
+        $name_parts = explode(' ', $name);
+        $first_name = $name_parts[0];
+        
+        // Don't use Customer- prefix in messages
+        if (strpos($first_name, 'Customer-') === 0) {
+            $greeting = "";
+        } else {
+            $greeting = "Hi $first_name! ";
+        }
+        
         kwetupizza_log("Found order #$order_id for: {$order->customer_name}, phone: {$order->customer_phone}", 'info', 'notifications.log');
         
         $status_messages = array(
-            'processing' => "Your order #$order_id is now being processed. We'll update you when it's ready for delivery.",
-            'preparing' => "Your order #$order_id is being prepared in our kitchen. It will be ready soon!",
-            'ready_for_delivery' => "Good news! Your order #$order_id is ready and out for delivery. It will arrive in approximately 15-30 minutes.",
-            'delivered' => "Your order #$order_id has been delivered. Enjoy your meal! Thank you for choosing Kwetu Pizza.",
-            'cancelled' => "Your order #$order_id has been cancelled. Please contact us if you have any questions.",
-            'payment_confirmed' => "Payment confirmed for Order #$order_id! Your pizza is being prepared and will be delivered to you soon.",
-            'payment_failed' => "❌ Payment for Order #$order_id has failed. This could be due to insufficient funds, network issues, or a declined transaction. You can retry payment from your account or contact our support at " . get_option('kwetupizza_support_phone', '+255000000000') . " for assistance."
+            'processing' => "{$greeting}Your order #$order_id is now being processed. We'll update you when it's ready for delivery.",
+            'preparing' => "{$greeting}Your order #$order_id is being prepared in our kitchen. It will be ready soon!",
+            'ready_for_delivery' => "{$greeting}Good news! Your order #$order_id is ready and out for delivery. It will arrive in approximately 15-30 minutes.",
+            'delivered' => "{$greeting}Your order #$order_id has been delivered. Enjoy your meal! Thank you for choosing Kwetu Pizza.",
+            'cancelled' => "{$greeting}Your order #$order_id has been cancelled. Please contact us if you have any questions.",
+            'payment_confirmed' => "{$greeting}Payment confirmed for Order #$order_id! Your pizza is being prepared and will be delivered to you soon.",
+            'payment_failed' => "❌ {$greeting}Payment for Order #$order_id has failed. This could be due to insufficient funds, network issues, or a declined transaction. You can retry payment from your account or contact our support at " . get_option('kwetupizza_support_phone', '+255000000000') . " for assistance.",
+            'dispatched' => "{$greeting}Great news! Your order #$order_id has been dispatched and is on the way to you. Expect delivery soon!"
         );
         
-        $message = isset($status_messages[$status]) ? $status_messages[$status] : "Your order #$order_id status has been updated to: $status";
+        $message = isset($status_messages[$status]) ? $status_messages[$status] : "{$greeting}Your order #$order_id status has been updated to: $status";
         
         if (!empty($additional_message)) {
             $message .= "\n\n" . $additional_message;
@@ -2370,7 +2369,7 @@ if (!function_exists('kwetupizza_notify_customer')) {
         
         kwetupizza_log("Preparing to send notification message: " . substr($message, 0, 100) . "...", 'info', 'notifications.log');
         
-        // Send WhatsApp notification
+        // Send WhatsApp notification - no need to further personalize as we did it already
         $whatsapp_sent = kwetupizza_send_whatsapp_message($order->customer_phone, $message);
         
         if ($whatsapp_sent) {
@@ -3006,3 +3005,268 @@ add_action('kwetupizza_send_customer_feedback_request', 'kwetupizza_send_custome
 
 // Add a hook for sending delivery confirmation
 add_action('kwetupizza_send_delivery_confirmation', 'kwetupizza_send_delivery_confirmation_request');
+
+/**
+ * Get user by phone number or create a new one if doesn't exist
+ */
+if (!function_exists('kwetupizza_get_or_create_user')) {
+    function kwetupizza_get_or_create_user($phone) {
+        global $wpdb;
+        $users_table = $wpdb->prefix . 'kwetupizza_users';
+        
+        // Sanitize phone number
+        $phone = kwetupizza_sanitize_phone($phone);
+        
+        // Check if user exists
+        $user = $wpdb->get_row($wpdb->prepare("SELECT * FROM $users_table WHERE phone = %s", $phone));
+        
+        // If user exists, return user data
+        if ($user) {
+            kwetupizza_log("Existing user found for phone: $phone, Name: {$user->name}", 'info');
+            return $user;
+        }
+        
+        // User doesn't exist, create a new one with default name
+        $default_name = "Customer-" . substr($phone, -5); // Last 5 digits of phone number
+        
+        $wpdb->insert(
+            $users_table,
+            array(
+                'name' => $default_name,
+                'email' => '',
+                'phone' => $phone,
+                'role' => 'customer',
+                'state' => 'greeting',
+                'created_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql')
+            )
+        );
+        
+        if ($wpdb->insert_id) {
+            kwetupizza_log("New user created for phone: $phone with name: $default_name", 'info');
+            return $wpdb->get_row($wpdb->prepare("SELECT * FROM $users_table WHERE phone = %s", $phone));
+        }
+        
+        // If insert failed, return a basic user object
+        kwetupizza_log("Failed to create user record for phone: $phone", 'error');
+        $fallback_user = new stdClass();
+        $fallback_user->id = 0;
+        $fallback_user->name = $default_name;
+        $fallback_user->phone = $phone;
+        $fallback_user->email = '';
+        $fallback_user->role = 'customer';
+        $fallback_user->state = 'greeting';
+        
+        return $fallback_user;
+    }
+}
+
+/**
+ * Personalize message with user's name
+ */
+if (!function_exists('kwetupizza_personalize_message')) {
+    function kwetupizza_personalize_message($phone, $message) {
+        // Get user
+        $user = kwetupizza_get_or_create_user($phone);
+        
+        // Extract first name if full name is provided
+        $name_parts = explode(' ', $user->name);
+        $first_name = $name_parts[0];
+        
+        // If default customer name, don't personalize
+        if (strpos($first_name, 'Customer-') === 0) {
+            return $message;
+        }
+        
+        // Add personalization if message doesn't already include name
+        if (strpos($message, $first_name) === false) {
+            // If message starts with an emoji, preserve it
+            if (preg_match('/^(\p{So}\s)/u', $message, $matches)) {
+                $emoji = $matches[1];
+                $message = preg_replace('/^(\p{So}\s)/u', '', $message, 1);
+                return $emoji . "Hi " . $first_name . "! " . $message;
+            }
+            
+            return "Hi " . $first_name . "! " . $message;
+        }
+        
+        return $message;
+    }
+}
+
+// Update the send_greeting function to use the new personalization
+if (!function_exists('kwetupizza_send_greeting')) {
+    function kwetupizza_send_greeting($from) {
+        // Get or create user
+        $user = kwetupizza_get_or_create_user($from);
+        
+        // Create personalized greeting
+        $name_parts = explode(' ', $user->name);
+        $first_name = $name_parts[0];
+        
+        // Personalized message
+        if (strpos($first_name, 'Customer-') === 0) {
+            $message = "👋 *Hello! Welcome to KwetuPizza* 🍕\n\n";
+        } else {
+            $message = "👋 *Hello " . $first_name . "! Welcome to KwetuPizza* 🍕\n\n";
+        }
+        
+        $message .= "How can I help you today?\n\n";
+        $message .= "📱 *Available Commands:*\n";
+        $message .= "• Type *menu* to browse our delicious menu by category\n";
+        $message .= "• Type *order* to start a new order\n";
+        $message .= "• Type *status* to check your recent order\n";
+        $message .= "• Type *help* for assistance\n\n";
+        $message .= "Our new interactive ordering system makes it easy to order your favorite pizza with just a few messages! Try it now by typing 'menu' 😊";
+        
+        // Add a prompt to update name if using default name
+        if (strpos($user->name, 'Customer-') === 0) {
+            $message .= "\n\n💡 *Tip:* Would you like to tell us your name? Just reply with 'name: [your name]' to personalize your experience!";
+        }
+        
+        kwetupizza_send_whatsapp_message($from, $message);
+        
+        // Initialize empty context with state set to 'greeting'
+        kwetupizza_set_conversation_context($from, ['state' => 'greeting']);
+    }
+}
+
+// Update send_whatsapp_message to use personalization
+if (!function_exists('kwetupizza_send_whatsapp_message')) {
+    function kwetupizza_send_whatsapp_message($phone, $message) {
+        // Only personalize messages if not already personalized
+        if (strpos($message, 'Hi ') !== 0 && strpos($message, 'Hello ') !== 0) {
+            $message = kwetupizza_personalize_message($phone, $message);
+        }
+        
+        // Rest of the original function...
+        
+        // Compatibility with older versions that didn't require API credentials
+        $api_key = get_option('kwetupizza_whatsapp_api_key', '');
+        $instance_id = get_option('kwetupizza_whatsapp_instance', '');
+        
+        if (empty($api_key) || empty($instance_id)) {
+            // Fallback to hardcoded values (legacy support)
+            $api_key = '13YX7UDXCL9DQ2AF';
+            $instance_id = '23';
+        }
+        
+        // Format phone to international format
+        $phone = kwetupizza_sanitize_phone($phone);
+        
+        // Prepare API request
+        $url = "https://api.ultramsg.com/{$instance_id}/messages/chat";
+        $params = array(
+            'token' => $api_key,
+            'to' => $phone,
+            'body' => $message,
+            'priority' => 10
+        );
+        
+        // Log the message we're about to send
+        kwetupizza_log("Sending WhatsApp message to $phone: " . substr($message, 0, 50) . "...", 'info');
+        
+        // Make API request
+        $response = wp_remote_post($url, array(
+            'method' => 'POST',
+            'timeout' => 45,
+            'redirection' => 5,
+            'httpversion' => '1.0',
+            'blocking' => true,
+            'headers' => array('Content-Type' => 'application/x-www-form-urlencoded'),
+            'body' => $params,
+            'cookies' => array()
+        ));
+        
+        // Check for successful response
+        if (is_wp_error($response)) {
+            $error_message = $response->get_error_message();
+            kwetupizza_log("WhatsApp API error: $error_message", 'error');
+            return false;
+        } else {
+            $body = wp_remote_retrieve_body($response);
+            $result = json_decode($body);
+            
+            if (isset($result->sent) && $result->sent === 'true') {
+                kwetupizza_log("WhatsApp message sent successfully to $phone", 'info');
+                return true;
+            } else {
+                kwetupizza_log("WhatsApp API returned error: " . print_r($result, true), 'error');
+                return false;
+            }
+        }
+    }
+}
+
+// Add a name update handler to the message handling function
+if (!function_exists('kwetupizza_handle_whatsapp_message')) {
+    function kwetupizza_handle_whatsapp_message($from, $message) {
+        $message = trim($message);
+        $lowercase_message = strtolower($message);
+        $context = kwetupizza_get_conversation_context($from);
+
+        // Log the incoming message and context
+        kwetupizza_log_context_and_input($from, $message);
+
+        // Check if this is a name update request
+        if (strpos($lowercase_message, 'name:') === 0) {
+            // Extract the name after "name:"
+            $name = trim(substr($message, 5));
+            
+            if (!empty($name)) {
+                global $wpdb;
+                $users_table = $wpdb->prefix . 'kwetupizza_users';
+                
+                // Update user's name
+                $wpdb->update(
+                    $users_table,
+                    array('name' => $name),
+                    array('phone' => kwetupizza_sanitize_phone($from))
+                );
+                
+                kwetupizza_send_whatsapp_message($from, "Thanks for sharing your name! I'll call you $name from now on. 😊\n\nIs there anything else I can help you with today?");
+                kwetupizza_set_conversation_context($from, ['state' => 'greeting']);
+                return;
+            }
+        }
+
+        // If context is empty, greet the user
+        if (empty($context)) {
+            kwetupizza_send_greeting($from);
+            return;
+        }
+
+        // Regular message handling as before
+        if (in_array($lowercase_message, ['hi', 'hello', 'hey', 'start'])) {
+            kwetupizza_send_greeting($from);
+        } elseif ($lowercase_message === 'menu' || $lowercase_message === 'order') {
+            kwetupizza_send_menu_categories($from);
+        } elseif ($lowercase_message === 'help') {
+            kwetupizza_send_help_message($from);
+        } elseif (strpos($lowercase_message, 'status') !== false || strpos($lowercase_message, 'my order') !== false) {
+            kwetupizza_check_order_status($from);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'category_selection') {
+            kwetupizza_handle_category_selection($from, $lowercase_message);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'menu_selection') {
+            kwetupizza_process_order($from, $lowercase_message);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'quantity') {
+            kwetupizza_confirm_order_and_request_address($from, $context['cart'][count($context['cart']) - 1]['product_id'], $message);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'add_or_checkout') {
+            kwetupizza_handle_add_or_checkout($from, $lowercase_message);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'address') {
+            kwetupizza_show_delivery_zones($from);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'delivery_zone') {
+            kwetupizza_handle_delivery_zone_selection($from, $lowercase_message);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'full_address') {
+            kwetupizza_handle_address_and_ask_payment_provider($from, $message);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'payment_provider') {
+            kwetupizza_handle_payment_provider_response($from, $lowercase_message);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'use_whatsapp_number') {
+            kwetupizza_handle_use_whatsapp_number_response($from, $lowercase_message);
+        } elseif (isset($context['awaiting']) && $context['awaiting'] === 'payment_phone') {
+            kwetupizza_handle_payment_phone_input($from, $message);
+        } else {
+            kwetupizza_send_default_message($from);
+        }
+    }
+}
