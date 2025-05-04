@@ -247,7 +247,7 @@ function kwetupizza_create_pages() {
             'page_template' => 'paypal-checkout.php'
         ));
     }
-}
+    }
 }
 
 // ========================
@@ -880,7 +880,7 @@ function kwetupizza_add_loyalty_points($order_id) {
     }
     
     return true;
-}
+} 
 
 /**
  * Get customer email
@@ -1097,95 +1097,152 @@ if (!function_exists('kwetupizza_uninstall')) {
  * Main WhatsApp message handler
  */
 if (!function_exists('kwetupizza_handle_whatsapp_message')) {
-    function kwetupizza_handle_whatsapp_message($from, $message) {
+    function kwetupizza_handle_whatsapp_message($from, $message, $interactive_data = null) {
         // Log the context and input for debugging
         kwetupizza_log_context_and_input($from, $message);
         
         // Get current context (if any)
         $context = kwetupizza_get_conversation_context($from);
         
-        // Check if we're expecting a specific type of response
-        if (!empty($context['awaiting'])) {
-            $awaiting = $context['awaiting'];
+        // Process interactive data if provided
+        if ($interactive_data) {
+            // Log the interactive data
+            kwetupizza_log("Processing interactive data: " . json_encode($interactive_data), 'info', 'whatsapp.log');
             
-            // Handle different expected responses
-            if ($awaiting === 'registration_name') {
-                kwetupizza_handle_registration_name($from, $message);
-                return;
-            } else if ($awaiting === 'registration_email') {
-                kwetupizza_handle_registration_email($from, $message);
-                return;
-            } else if ($awaiting === 'registration_location') {
-                kwetupizza_handle_registration_location($from, $message);
-                return;
-            } else if ($awaiting === 'category_selection') {
-                kwetupizza_handle_category_selection($from, $message);
-                return;
-            } else if ($awaiting === 'menu_selection') {
-                kwetupizza_process_order($from, $message);
-                return;
-            } else if ($awaiting === 'quantity') {
-                // Get the last product in the cart
-                $last_product = end($context['cart']);
-                $product_id = $last_product['product_id'];
-                kwetupizza_confirm_order_and_request_address($from, $product_id, intval(trim($message)));
-                return;
-            } else if ($awaiting === 'product_quantity') {
-                kwetupizza_confirm_order_and_request_address($from, $context['product_id'], intval(trim($message)));
-                return;
-            } else if ($awaiting === 'add_or_checkout') {
-                kwetupizza_handle_add_or_checkout($from, $message);
-                return;
-            } else if ($awaiting === 'user_name') {
-                kwetupizza_handle_user_name_input($from, $message);
-                return;
-            } else if ($awaiting === 'user_email') {
-                kwetupizza_handle_user_email_input($from, $message);
-                return;
-            } else if ($awaiting === 'delivery_zone') {
-                kwetupizza_handle_delivery_zone_selection($from, $message);
-                return;
-            } else if ($awaiting === 'delivery_address') {
-                kwetupizza_handle_address_and_ask_payment_provider($from, $message);
-                return;
-            } else if ($awaiting === 'payment_provider') {
-                kwetupizza_handle_payment_provider($from, $message);
-                return;
-            } else if ($awaiting === 'order_completion') {
-                // Order is complete, just reply with a generic message
-                kwetupizza_send_whatsapp_message($from, "Thank you for your order! You'll receive updates as your pizza is prepared and delivered. If you have any questions, please type 'help'.");
-                return;
+            if ($interactive_data['type'] === 'button') {
+                // Process button response
+                $button_id = $interactive_data['button_id'];
+                $button_text = $interactive_data['button_text'];
+                
+                // Map button IDs to expected message responses
+                switch ($button_id) {
+                    case 'btn_add':
+                        $message = 'add';
+                        break;
+                    case 'btn_checkout':
+                        $message = 'checkout';
+                        break;
+                    case 'btn_yes':
+                        $message = '1';
+                        break;
+                    case 'btn_no':
+                        $message = '2';
+                        break;
+                    case 'btn_menu':
+                        $message = 'menu';
+                        break;
+                    case 'btn_help':
+                        $message = 'help';
+                        break;
+                    case 'btn_status':
+                        $message = 'status';
+                        break;
+                    default:
+                        // For other buttons, use the button text as the message
+                        $message = $button_text;
+                        break;
+                }
+            } elseif ($interactive_data['type'] === 'list') {
+                // Process list selection
+                $list_id = $interactive_data['list_id'];
+                $list_title = $interactive_data['list_title'];
+                
+                // Use the list title as the message
+                $message = $list_title;
             }
+            
+            kwetupizza_log("Converted interactive response to message: $message", 'info', 'whatsapp.log');
         }
         
-        // If not expecting a specific response, check for standard commands
-        $message = trim($message);
-        $lowercase_message = strtolower($message);
-        
-        // Check for standard commands
-        if ($lowercase_message === 'menu' || $lowercase_message === 'order') {
-            kwetupizza_send_menu_categories($from);
+        // Check if this is a greeting
+        if (kwetupizza_is_greeting($message)) {
+            kwetupizza_send_greeting($from);
             return;
         }
         
-        if ($lowercase_message === 'status') {
-            kwetupizza_check_order_status($from);
-            return;
-        }
-        
-        if (strtolower(trim($message)) === 'help' || strpos(strtolower($message), 'help me') !== false) {
+        // Handle help command
+        if (strtolower(trim($message)) === 'help') {
             kwetupizza_send_help_message($from);
             return;
         }
         
-        // Check if the message is a greeting
-        if (kwetupizza_is_greeting($message)) {
-            kwetupizza_start_conversation($from);
+        // Handle status check
+        if (strtolower(trim($message)) === 'status') {
+            kwetupizza_check_order_status($from);
+            return;
+        }
+
+        // Check if we're waiting for a specific response
+        if (isset($context['awaiting'])) {
+            switch ($context['awaiting']) {
+                case 'registration_name':
+                    return kwetupizza_handle_registration_name($from, $message);
+                    
+                case 'registration_email':
+                    return kwetupizza_handle_registration_email($from, $message);
+                    
+                case 'registration_location':
+                    return kwetupizza_handle_registration_location($from, $message);
+                    
+                case 'menu_selection':
+                    $selection = trim($message);
+                    return kwetupizza_handle_category_selection($from, $selection);
+                    
+                case 'product_selection':
+                    $product_id = trim($message);
+                    if (is_numeric($product_id)) {
+                        return kwetupizza_process_order($from, intval($product_id));
+                    } else {
+                        // Try to match by name
+                        return kwetupizza_process_order($from, $product_id);
+                    }
+                    
+                case 'add_or_checkout':
+                    return kwetupizza_handle_add_or_checkout($from, $message);
+                    
+                case 'user_name':
+                    return kwetupizza_handle_user_name_input($from, $message);
+                    
+                case 'user_email':
+                    return kwetupizza_handle_user_email_input($from, $message);
+                    
+                case 'delivery_zone':
+                    return kwetupizza_handle_delivery_zone_selection($from, $message);
+                    
+                case 'address':
+                    return kwetupizza_handle_address_and_ask_payment_provider($from, $message);
+                    
+                case 'payment_provider':
+                    return kwetupizza_handle_payment_provider($from, $message);
+                    
+                case 'use_whatsapp_number':
+                    return kwetupizza_handle_use_whatsapp_number_response($from, $message);
+                    
+                case 'payment_phone':
+                    return kwetupizza_handle_payment_phone_input($from, $message);
+                    
+                default:
+                    // If we don't recognize the awaiting state, reset and send default message
+                    $context['awaiting'] = null;
+                    kwetupizza_set_conversation_context($from, $context);
+                    kwetupizza_send_whatsapp_message($from, "Sorry, I didn't understand that. Type 'menu' to see available options.");
+                    return;
+            }
+        }
+        
+        // No context or no awaiting state, handle general commands
+        $message = strtolower(trim($message));
+        
+        if ($message === 'menu' || $message === 'order' || $message === 'start') {
+            // Send the menu categories
+            kwetupizza_send_menu_categories($from);
+            $context['awaiting'] = 'menu_selection';
+            kwetupizza_set_conversation_context($from, $context);
             return;
         }
         
         // Default response for unrecognized messages
-        kwetupizza_send_default_response($from);
+        kwetupizza_send_default_message($from);
     }
 }
 
@@ -3545,4 +3602,25 @@ if (!function_exists('kwetupizza_personalize_message')) {
         
         return $message;
     }  
+}
+
+/**
+ * Check if a message is a greeting
+ */
+if (!function_exists('kwetupizza_is_greeting')) {
+    function kwetupizza_is_greeting($message) {
+        $message = strtolower(trim($message));
+        $greetings = array(
+            'hello', 'hi', 'hey', 'howdy', 'greetings', 'good morning', 'good afternoon', 
+            'good evening', 'hola', 'bonjour', 'jambo', 'habari', 'mambo', 'sasa', 'niaje'
+        );
+        
+        foreach ($greetings as $greeting) {
+            if (strpos($message, $greeting) !== false) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
 }
