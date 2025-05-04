@@ -1190,19 +1190,57 @@ if (!function_exists('kwetupizza_handle_whatsapp_message')) {
                     
                 case 'registration_location':
                     return kwetupizza_handle_registration_location($from, $message);
+
+                case 'category_selection':
+                    return kwetupizza_handle_category_selection($from, $message);
                     
                 case 'menu_selection':
-                    $selection = trim($message);
-                    return kwetupizza_handle_category_selection($from, $selection);
-                    
-                case 'product_selection':
+                    // This is where product selection happens
                     $product_id = trim($message);
                     if (is_numeric($product_id)) {
                         return kwetupizza_process_order($from, intval($product_id));
                     } else {
-                        // Try to match by name
-                        return kwetupizza_process_order($from, $product_id);
+                        // If they didn't enter a valid number, send an error
+                        kwetupizza_send_whatsapp_message($from, "Please enter a valid product number from the menu.");
+                        return;
                     }
+                    
+                case 'quantity':
+                    $quantity = intval(trim($message));
+                    if ($quantity <= 0) {
+                        kwetupizza_send_whatsapp_message($from, "Please enter a valid quantity (at least 1).");
+                        return;
+                    }
+                    
+                    // Make sure there is a cart in the context
+                    if (!isset($context['cart']) || empty($context['cart'])) {
+                        kwetupizza_send_whatsapp_message($from, "Sorry, there was an issue with your order. Please start over by typing 'menu'.");
+                        $context['awaiting'] = null;
+                        kwetupizza_set_conversation_context($from, $context);
+                        return;
+                    }
+                    
+                    // Get the last product in the cart
+                    $last_product_index = count($context['cart']) - 1;
+                    $last_product = &$context['cart'][$last_product_index];
+                    
+                    // Update the quantity and calculate total
+                    $last_product['quantity'] = $quantity;
+                    $last_product['total'] = $last_product['price'] * $quantity;
+                    
+                    // Update the context
+                    kwetupizza_set_conversation_context($from, $context);
+                    
+                    // Ask if they want to add more or checkout
+                    $message = "You've added {$quantity} x {$last_product['product_name']} to your cart.\n\n";
+                    $message .= "Would you like to add more items or proceed to checkout?\n\n";
+                    $message .= "Type 'add' to add more items or 'checkout' to proceed.";
+                    kwetupizza_send_whatsapp_message($from, $message);
+                    
+                    // Update awaiting state
+                    $context['awaiting'] = 'add_or_checkout';
+                    kwetupizza_set_conversation_context($from, $context);
+                    return;
                     
                 case 'add_or_checkout':
                     return kwetupizza_handle_add_or_checkout($from, $message);
@@ -1542,40 +1580,27 @@ if (!function_exists('kwetupizza_process_order')) {
             kwetupizza_send_whatsapp_message($from, $message);
             
             $context = kwetupizza_get_conversation_context($from);
+            
+            // Initialize cart array if it doesn't exist
+            if (!isset($context['cart'])) {
+                $context['cart'] = [];
+            }
+            
+            // Add the product to cart with initial quantity of 0
             $context['cart'][] = [
                 'product_id' => $product_id,
                 'product_name' => $product->product_name,
-                'price' => $product->price
+                'price' => $product->price,
+                'quantity' => 0,
+                'total' => 0
             ];
-            kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'quantity']));
+            
+            // Set awaiting to quantity to get quantity input
+            $context['awaiting'] = 'quantity';
+            kwetupizza_set_conversation_context($from, $context);
         } else {
             kwetupizza_send_whatsapp_message($from, "Sorry, the selected item is not available.");
         }
-    }
-}
-
-/**
- * Confirm order and request address
- */
-if (!function_exists('kwetupizza_confirm_order_and_request_address')) {
-    function kwetupizza_confirm_order_and_request_address($from, $product_id, $quantity) {
-        global $wpdb;
-        $context = kwetupizza_get_conversation_context($from);
-
-        foreach ($context['cart'] as &$cart_item) {
-            if ($cart_item['product_id'] == $product_id) {
-                $cart_item['quantity'] = $quantity;
-                $cart_item['total'] = $cart_item['price'] * $quantity;
-                break;
-            }
-        }
-
-        kwetupizza_set_conversation_context($from, $context);
-
-        $message = "Would you like to add more items or proceed to checkout? Type 'add' to add more items or 'checkout' to proceed.";
-        kwetupizza_send_whatsapp_message($from, $message);
-
-        kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'add_or_checkout']));
     }
 }
 
