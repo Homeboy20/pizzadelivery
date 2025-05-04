@@ -1668,8 +1668,9 @@ if (!function_exists('kwetupizza_handle_user_name_input')) {
         $message = "Thank you, " . explode(' ', $name)[0] . "! Please provide your email address (or type 'skip' if you prefer not to):";
         kwetupizza_send_whatsapp_message($from, $message);
         
-        // Update context to await email
-        kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'user_email']));
+        // Update context to await email while preserving delivery zone info
+        $context['awaiting'] = 'user_email';
+        kwetupizza_set_conversation_context($from, $context);
     }
 }
 
@@ -1795,7 +1796,7 @@ if (!function_exists('kwetupizza_handle_delivery_zone_selection')) {
         kwetupizza_send_whatsapp_message($from, $message);
         
         // Update context to await full address
-        kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'full_address']));
+        kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'address']));
     }
 }
 
@@ -1828,24 +1829,17 @@ if (!function_exists('kwetupizza_handle_address_and_ask_payment_provider')) {
             }
             
             $summary_message .= "Delivery Address: {$address}\n\n";
-            $summary_message .= "Please select your Mobile Money network for payment:";
-            
-            // Show interactive network selection buttons
-            $networks = [
-                "1" => "Vodacom (M-Pesa)",
-                "2" => "Tigo (Tigo Pesa)",
-                "3" => "Airtel (Airtel Money)",
-                "4" => "Halotel (Halopesa)"
-            ];
-            
-            foreach ($networks as $key => $network) {
-                $summary_message .= "\n{$key}. {$network}";
-            }
+            $summary_message .= "Please select your Mobile Money network for payment:\n";
+            $summary_message .= "1. Vodacom (M-Pesa)\n";
+            $summary_message .= "2. Tigo (Tigo Pesa)\n";
+            $summary_message .= "3. Airtel (Airtel Money)\n";
+            $summary_message .= "4. Halotel (Halopesa)";
             
             kwetupizza_send_whatsapp_message($from, $summary_message);
 
             // Set the context to expect a network provider response
-            kwetupizza_set_conversation_context($from, array_merge($context, ['awaiting' => 'payment_provider']));
+            $context['awaiting'] = 'payment_provider';
+            kwetupizza_set_conversation_context($from, $context);
         } else {
             kwetupizza_send_whatsapp_message($from, "Error processing your order. Please try again.");
         }
@@ -3629,5 +3623,71 @@ if (!function_exists('kwetupizza_is_greeting')) {
         }
         
         return false;
+    }
+}
+
+/**
+ * Handle payment provider selection
+ */
+if (!function_exists('kwetupizza_handle_payment_provider')) {
+    function kwetupizza_handle_payment_provider($from, $provider) {
+        $context = kwetupizza_get_conversation_context($from);
+        
+        $valid_providers = [
+            '1' => 'vodacom',
+            '2' => 'tigo',
+            '3' => 'airtel',
+            '4' => 'halopesa'
+        ];
+        
+        // Map common names to our provider keys
+        $provider_map = [
+            'vodacom' => 'vodacom',
+            'mpesa' => 'vodacom',
+            'm-pesa' => 'vodacom',
+            'tigo' => 'tigo',
+            'tigopesa' => 'tigo',
+            'airtel' => 'airtel',
+            'airtelmoney' => 'airtel',
+            'halo' => 'halopesa',
+            'halopesa' => 'halopesa'
+        ];
+        
+        // Try to match input to a provider
+        $provider_key = null;
+        $provider_input = strtolower(trim($provider));
+        
+        if (isset($valid_providers[$provider_input])) {
+            $provider_key = $valid_providers[$provider_input];
+        } elseif (isset($provider_map[$provider_input])) {
+            $provider_key = $provider_map[$provider_input];
+        }
+        
+        if ($provider_key) {
+            // Save the provider to the conversation context
+            $context['payment_provider'] = $provider_key;
+            kwetupizza_set_conversation_context($from, $context);
+            
+            // Handle mobile money flow
+            $message = "You've selected " . strtoupper($provider_key) . " for payment.\n\n";
+            $message .= "Would you like to use your WhatsApp number (" . kwetupizza_sanitize_phone($from) . ") for payment?\n\n";
+            $message .= "1. Yes\n";
+            $message .= "2. No (provide another number)";
+            
+            kwetupizza_send_whatsapp_message($from, $message);
+            
+            // Set context to await response to use WhatsApp number or not
+            $context['awaiting'] = 'use_whatsapp_number';
+            kwetupizza_set_conversation_context($from, $context);
+        } else {
+            // Invalid provider selection
+            $message = "Please select a valid payment method (1-4):\n\n";
+            $message .= "1. Vodacom (M-Pesa)\n";
+            $message .= "2. Tigo Pesa\n";
+            $message .= "3. Airtel Money\n";
+            $message .= "4. Halo Pesa";
+            
+            kwetupizza_send_whatsapp_message($from, $message);
+        }
     }
 }
