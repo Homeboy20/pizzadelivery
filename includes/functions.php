@@ -1191,11 +1191,16 @@ if (!function_exists('kwetupizza_handle_whatsapp_message')) {
                 case 'registration_location':
                     return kwetupizza_handle_registration_location($from, $message);
 
-                case 'category_selection':
-                    return kwetupizza_handle_category_selection($from, $message);
+                case 'category_selection': // Expecting a category number (1-4)
+                    $selection = trim($message);
+                    if (is_numeric($selection) && $selection >= 1 && $selection <= 4) {
+                        return kwetupizza_handle_category_selection($from, $selection);
+                    } else {
+                        kwetupizza_send_whatsapp_message($from, "Please enter a valid category number (1-4).");
+                        return; 
+                    }
                     
-                case 'menu_selection':
-                    // This is where product selection happens
+                case 'menu_selection': // Expecting a product ID from the menu shown
                     $product_id = trim($message);
                     if (is_numeric($product_id)) {
                         return kwetupizza_process_order($from, intval($product_id));
@@ -1220,8 +1225,15 @@ if (!function_exists('kwetupizza_handle_whatsapp_message')) {
                         return;
                     }
                     
-                    // Get the last product in the cart
+                    // Get the last product added to the cart
                     $last_product_index = count($context['cart']) - 1;
+                    // Ensure the index is valid before accessing
+                    if ($last_product_index < 0) {
+                         kwetupizza_send_whatsapp_message($from, "Sorry, there was an issue retrieving your cart. Please start over by typing 'menu'.");
+                         $context['awaiting'] = null;
+                         kwetupizza_set_conversation_context($from, $context);
+                         return;
+                    }
                     $last_product = &$context['cart'][$last_product_index];
                     
                     // Update the quantity and calculate total
