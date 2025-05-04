@@ -18,33 +18,6 @@ define('KWETUPIZZA_VERSION', '2.0');
 define('KWETUPIZZA_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('KWETUPIZZA_PLUGIN_URL', plugin_dir_url(__FILE__));
 
-// Include interactive buttons support - these need to be loaded early
-if (file_exists(KWETUPIZZA_PLUGIN_DIR . 'interactive-buttons.php')) {
-    require_once KWETUPIZZA_PLUGIN_DIR . 'interactive-buttons.php';
-}
-
-if (file_exists(KWETUPIZZA_PLUGIN_DIR . 'whatsapp-interactive-buttons.php')) {
-    require_once KWETUPIZZA_PLUGIN_DIR . 'whatsapp-interactive-buttons.php';
-}
-
-// Include interactive buttons setup
-if (file_exists(KWETUPIZZA_PLUGIN_DIR . 'kwetu-interactive-buttons-setup.php')) {
-    require_once KWETUPIZZA_PLUGIN_DIR . 'kwetu-interactive-buttons-setup.php';
-}
-
-// Remove any duplicate functions.php files
-if (file_exists(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_new.php')) {
-    unlink(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_new.php');
-}
-
-if (file_exists(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_part1.php')) {
-    unlink(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_part1.php');
-}
-
-if (file_exists(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_part2.php')) {
-    unlink(KWETUPIZZA_PLUGIN_DIR . 'includes/functions_part2.php');
-}
-
 // Include core functions - ensure we're only loading the main functions file
 require_once KWETUPIZZA_PLUGIN_DIR . 'includes/functions.php';
 
