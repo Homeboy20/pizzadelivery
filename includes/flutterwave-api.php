@@ -14,16 +14,16 @@ if (!defined('ABSPATH')) {
  * Initialize a Flutterwave transaction
  * 
  * @param float $amount The amount to charge
- * @param string $currency The currency code (default: TZS)
  * @param string $tx_ref The transaction reference
  * @param array $customer Customer details (email, phone_number, name)
  * @param string $redirect_url URL to redirect after payment
+ * @param string $currency The currency code (default: TZS)
  * @param array $meta Additional metadata for the transaction
  * @param string $payment_method Payment method (default: mobile_money_tanzania)
  * @return array|WP_Error Response from Flutterwave or error
  */
 if (!function_exists('kwetupizza_initialize_flutterwave_transaction')) {
-    function kwetupizza_initialize_flutterwave_transaction($amount, $currency = 'TZS', $tx_ref, $customer, $redirect_url, $meta = [], $payment_method = 'mobile_money_tanzania') {
+    function kwetupizza_initialize_flutterwave_transaction($amount, $tx_ref, $customer, $redirect_url, $currency = 'TZS', $meta = [], $payment_method = 'mobile_money_tanzania') {
         // Get the Flutterwave API key
         $flw_secret_key = get_option('kwetupizza_flw_secret_key');
         
@@ -178,10 +178,10 @@ if (!function_exists('kwetupizza_process_mobile_money_payment')) {
         // Initialize the transaction
         $result = kwetupizza_initialize_flutterwave_transaction(
             $amount,
-            'TZS',
             $tx_ref,
             $customer,
             $redirect_url,
+            'TZS',
             $meta,
             'mobile_money_tanzania'
         );

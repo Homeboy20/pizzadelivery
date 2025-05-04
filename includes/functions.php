@@ -1,15 +1,25 @@
 <?php
-// Prevent direct access and ensure WordPress is loaded
+/**
+ * KwetuPizza Core Functions
+ * 
+ * This file contains all the core functions for the KwetuPizza plugin.
+ * Functions are organized by category for better maintainability.
+ */
+
+// Prevent direct access
 if (!defined('ABSPATH')) {
     die('Access denied.');
 }
 
-// Ensure we have access to WordPress core functions
+// Make sure WordPress core is loaded
 if (!function_exists('add_action')) {
     require_once(dirname(dirname(dirname(dirname(__FILE__)))) . '/wp-load.php');
 }
 
-// Include core functions - ensure we're only loading the main functions file
+// Include core WordPress functionality if needed
+require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
+
+// Include related files if they exist
 if (file_exists(dirname(__FILE__) . '/api-controller.php')) {
     require_once dirname(__FILE__) . '/api-controller.php';
 }
@@ -36,9 +46,6 @@ function kwetupizza_create_tables() {
     // Check if we need to upgrade the tables
     $current_db_version = get_option('kwetupizza_db_version', '0');
     
-    // Include WordPress upgrade functions
-    require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-
     // Users Table
     $users_table = $wpdb->prefix . 'kwetupizza_users';
     $sql = "CREATE TABLE $users_table (
