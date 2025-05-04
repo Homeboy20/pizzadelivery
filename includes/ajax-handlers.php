@@ -14,19 +14,21 @@ if (!defined('ABSPATH')) {
 /**
  * Register AJAX handlers for WhatsApp and SMS
  */
-function kwetupizza_register_ajax_handlers() {
-    // Admin-side AJAX handlers
-    add_action('wp_ajax_kwetupizza_test_whatsapp', 'kwetupizza_test_whatsapp_ajax');
-    add_action('wp_ajax_kwetupizza_test_sms', 'kwetupizza_test_sms_ajax');
-    add_action('wp_ajax_kwetupizza_init_sample_data', 'kwetupizza_init_sample_data_ajax');
-    
-    // Frontend AJAX handlers
-    add_action('wp_ajax_kwetupizza_process_order', 'kwetupizza_process_order_ajax');
-    add_action('wp_ajax_nopriv_kwetupizza_process_order', 'kwetupizza_process_order_ajax');
-    add_action('wp_ajax_kwetupizza_update_cart', 'kwetupizza_update_cart_ajax');
-    add_action('wp_ajax_nopriv_kwetupizza_update_cart', 'kwetupizza_update_cart_ajax');
-    add_action('wp_ajax_kwetupizza_calculate_delivery', 'kwetupizza_calculate_delivery_ajax');
-    add_action('wp_ajax_nopriv_kwetupizza_calculate_delivery', 'kwetupizza_calculate_delivery_ajax');
+if (!function_exists('kwetupizza_register_ajax_handlers')) {
+    function kwetupizza_register_ajax_handlers() {
+        // Admin-side AJAX handlers
+        add_action('wp_ajax_kwetupizza_test_whatsapp', 'kwetupizza_test_whatsapp_ajax');
+        add_action('wp_ajax_kwetupizza_test_sms', 'kwetupizza_test_sms_ajax');
+        add_action('wp_ajax_kwetupizza_init_sample_data', 'kwetupizza_init_sample_data_ajax');
+        
+        // Frontend AJAX handlers
+        add_action('wp_ajax_kwetupizza_process_order', 'kwetupizza_process_order_ajax');
+        add_action('wp_ajax_nopriv_kwetupizza_process_order', 'kwetupizza_process_order_ajax');
+        add_action('wp_ajax_kwetupizza_update_cart', 'kwetupizza_update_cart_ajax');
+        add_action('wp_ajax_nopriv_kwetupizza_update_cart', 'kwetupizza_update_cart_ajax');
+        add_action('wp_ajax_kwetupizza_calculate_delivery', 'kwetupizza_calculate_delivery_ajax');
+        add_action('wp_ajax_nopriv_kwetupizza_calculate_delivery', 'kwetupizza_calculate_delivery_ajax');
+    }
 }
 add_action('init', 'kwetupizza_register_ajax_handlers');
 
